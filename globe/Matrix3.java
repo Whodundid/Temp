@@ -20,11 +20,11 @@ public class Matrix3 {
         return new Matrix3(result);
     }
     
-    public Vertex transform(Vertex in) {
-        double x = in.x * values[0] + in.y * values[3] + in.z * values[6];
-        double y = in.x * values[1] + in.y * values[4] + in.z * values[7];
-        double z = in.x * values[2] + in.y * values[5] + in.z * values[8];
-        return new Vertex(x, y, z);
+    public Vector transform(Vector in) {
+        float x = (float) (in.x * values[0] + in.y * values[3] + in.z * values[6]);
+        float y = (float) (in.x * values[1] + in.y * values[4] + in.z * values[7]);
+        float z = (float) (in.x * values[2] + in.y * values[5] + in.z * values[8]);
+        return new Vector(x, y, z);
     }
     
 }
