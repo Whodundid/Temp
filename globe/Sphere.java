@@ -2,66 +2,58 @@ package controller.globe;
 
 import java.awt.Color;
 
-import eutil.datatypes.util.EList;
-
-public class Sphere {
-    
-    //========
-    // Fields
-    //========
-    
-    public EList<Triangle> triangles = EList.newList();
+public class Sphere extends Shape {
     
     //==============
     // Constructors
     //==============
     
-    public Sphere() {
-        setup();
+    public Sphere() { this(0.0f, 0.0f, 0.0f, 1.0f); }
+    public Sphere(float radius) { this(0.0f, 0.0f, 0.0f, radius); }
+    public Sphere(float x, float y, float z, float radius) {
+        super(x, y, z);
+        setup(radius);
     }
     
     //=========
     // Methods
     //=========
     
-    public void setup() {
+    public void setup(float radius) {
+        float stackCount = 18;
+        float sectorCount = 36;
         
-        double radius = 100;
-        
-        double stackCount = 18;
-        double sectorCount = 36;
-        
-        double PI = Math.PI;
-        double sectorStep = 2 * PI / sectorCount;
-        double stackStep = PI / stackCount;
+        float PI = (float) Math.PI;
+        float sectorStep = 2 * PI / sectorCount;
+        float stackStep = PI / stackCount;
         
         // mid
         {
             for (int i = 0; i < stackCount; i++) {
-                double stackAngleTop = PI / 2 - i * stackStep;
-                double stackAngleBot = PI / 2 - (i + 1) * stackStep;
-                double zTop = radius * Math.sin(stackAngleTop);
-                double zBot = radius * Math.sin(stackAngleBot);
+                float stackAngleTop = PI / 2 - i * stackStep;
+                float stackAngleBot = PI / 2 - (i + 1) * stackStep;
+                float zTop = (float) (radius * Math.sin(stackAngleTop));
+                float zBot = (float) (radius * Math.sin(stackAngleBot));
                 
                 for (int j = 0; j < sectorCount; j++) {
-                    double sectorAngle1 = j * sectorStep;
-                    double sectorAngle2 = (j + 1) * sectorStep;
-                    double x1 = radius * Math.cos(stackAngleTop) * Math.cos(sectorAngle1);
-                    double y1 = radius * Math.cos(stackAngleTop) * Math.sin(sectorAngle1);
-                    double x2 = radius * Math.cos(stackAngleTop) * Math.cos(sectorAngle2);
-                    double y2 = radius * Math.cos(stackAngleTop) * Math.sin(sectorAngle2);
-                    double x3 = radius * Math.cos(stackAngleBot) * Math.cos(sectorAngle1);
-                    double y3 = radius * Math.cos(stackAngleBot) * Math.sin(sectorAngle1);
-                    double x4 = radius * Math.cos(stackAngleBot) * Math.cos(sectorAngle2);
-                    double y4 = radius * Math.cos(stackAngleBot) * Math.sin(sectorAngle2);
+                    float sectorAngle1 = j * sectorStep;
+                    float sectorAngle2 = (j + 1) * sectorStep;
+                    float x1 = (float) (radius * Math.cos(stackAngleTop) * Math.cos(sectorAngle1));
+                    float y1 = (float) (radius * Math.cos(stackAngleTop) * Math.sin(sectorAngle1));
+                    float x2 = (float) (radius * Math.cos(stackAngleTop) * Math.cos(sectorAngle2));
+                    float y2 = (float) (radius * Math.cos(stackAngleTop) * Math.sin(sectorAngle2));
+                    float x3 = (float) (radius * Math.cos(stackAngleBot) * Math.cos(sectorAngle1));
+                    float y3 = (float) (radius * Math.cos(stackAngleBot) * Math.sin(sectorAngle1));
+                    float x4 = (float) (radius * Math.cos(stackAngleBot) * Math.cos(sectorAngle2));
+                    float y4 = (float) (radius * Math.cos(stackAngleBot) * Math.sin(sectorAngle2));
                     
-                    Vertex v1 = new Vertex(x1, y1, zTop);
-                    Vertex v2 = new Vertex(x2, y2, zTop);
-                    Vertex v3 = new Vertex(x3, y3, zBot);
-                    Vertex v4 = new Vertex(x4, y4, zBot);
+                    Vector v1 = new Vector(x1, y1, zTop);
+                    Vector v2 = new Vector(x2, y2, zTop);
+                    Vector v3 = new Vector(x3, y3, zBot);
+                    Vector v4 = new Vector(x4, y4, zBot);
                     
-                    triangles.add(new Triangle(v1, v3, v2, Color.GREEN));
-                    triangles.add(new Triangle(v2, v3, v4, Color.RED));
+                    triangles.add(new Triangle(v1, v3, v2, Color.WHITE));
+                    triangles.add(new Triangle(v2, v3, v4, Color.GRAY));
                 }
             }
         }
