@@ -64,29 +64,25 @@ public class Matrix4 {
         return new Matrix4();
     }
     
-    public static Matrix4 makeTransform(Shape shape) {
-        return makeTransform(shape.position, shape.rotation, shape.scale);
-    }
-    public static Matrix4 makeTransform(Vector pos, Vector rot, Vector scale) {
-        Matrix4 m = new Matrix4();
-        m.scale(scale);
-        m.rotateXYZ(rot);
-        m.translate(pos);
-        return m;
-    }
-    
-    public Matrix4 scale(Vector scale) { return scale(scale.x, scale.y, scale.z); }
+    public Matrix4 scale(Vector3 scale) { return scale(scale.x, scale.y, scale.z); }
     public Matrix4 scale(float x, float y, float z) { return set(multiply(makeScale(x, y, z))); }
     public Matrix4 scale(float value) { return set(multiply(makeScale(value))); }
     
-    public Matrix4 translate(Vector pos) { return translate(pos.x, pos.y, pos.z); }
+    public Matrix4 translate(Vector3 pos) { return translate(pos.x, pos.y, pos.z); }
     public Matrix4 translate(float x, float y, float z) { return set(multiply(makeTranslation(x, y, z))); }
     
-    public Matrix4 rotateXYZ(Vector rot) { return rotateXYZ(rot.x, rot.y, rot.z); }
+    public Matrix4 rotateXYZ(Vector3 rot) { return rotateXYZ(rot.x, rot.y, rot.z); }
     public Matrix4 rotateXYZ(float x, float y, float z) { return rotateX(x).rotateY(y).rotateZ(z); }
     public Matrix4 rotateX(float angleRad) { return set(multiply(makeRotationX(angleRad))); }
     public Matrix4 rotateY(float angleRad) { return set(multiply(makeRotationY(angleRad))); }
     public Matrix4 rotateZ(float angleRad) { return set(multiply(makeRotationZ(angleRad))); }
+    
+    public Matrix4 rotateXYZ_Degrees(Vector3 rot) { return rotateXYZ_Degrees(rot.x, rot.y, rot.z); }
+    public Matrix4 rotateXYZ_Degrees(float x, float y, float z) {
+        return rotateX((float) Math.toRadians(x)).
+               rotateY((float) Math.toRadians(y)).
+               rotateZ((float) Math.toRadians(z));
+    }
     
     public static Matrix4 makeRotationX(float angleRad) {
         Matrix4 m = new Matrix4();
@@ -158,16 +154,16 @@ public class Matrix4 {
         return m;
     }
     
-    public Matrix4 pointAt(Vector pos, Vector target, Vector up) {
+    public Matrix4 pointAt(Vector3 pos, Vector3 target, Vector3 up) {
         // calculate new forward direction
-        Vector newForward = target.sub(pos).norm();
+        Vector3 newForward = target.sub(pos).norm();
         
         // calculate new up direction
-        Vector a = newForward.mul(up.dot(newForward));
-        Vector newUp = up.sub(a).norm();
+        Vector3 a = newForward.mul(up.dot(newForward));
+        Vector3 newUp = up.sub(a).norm();
         
         // new right direction is cross product
-        Vector newRight = newUp.cross(newForward);
+        Vector3 newRight = newUp.cross(newForward);
         
         // construct dimensioning and translation matrix
         Matrix4 m = new Matrix4();
@@ -201,15 +197,15 @@ public class Matrix4 {
     
     public Triangle multiply(Triangle t) {
         Triangle r = new Triangle(t);
-        r.v0 = multiply(r.v0);
-        r.v1 = multiply(r.v1);
-        r.v2 = multiply(r.v2);
+        r.v0.pos = multiply(r.v0.pos);
+        r.v1.pos = multiply(r.v1.pos);
+        r.v2.pos = multiply(r.v2.pos);
         return r;
     }
     
-    public Vector multiply(Vector i) { return mulitply(i, this); }
-    public static Vector mulitply(Vector i, Matrix4 m) {
-        Vector o = new Vector();
+    public Vector3 multiply(Vector3 i) { return mulitply(i, this); }
+    public static Vector3 mulitply(Vector3 i, Matrix4 m) {
+        Vector3 o = new Vector3();
         o.x = i.x * m.m00 + i.y * m.m10 + i.z * m.m20 + m.m30;
         o.y = i.x * m.m01 + i.y * m.m11 + i.z * m.m21 + m.m31;
         o.z = i.x * m.m02 + i.y * m.m12 + i.z * m.m22 + m.m32;

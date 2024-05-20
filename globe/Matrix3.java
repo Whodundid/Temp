@@ -20,11 +20,11 @@ public class Matrix3 {
         return new Matrix3(result);
     }
     
-    public Vector transform(Vector in) {
+    public Vector3 transform(Vector3 in) {
         float x = (float) (in.x * values[0] + in.y * values[3] + in.z * values[6]);
         float y = (float) (in.x * values[1] + in.y * values[4] + in.z * values[7]);
         float z = (float) (in.x * values[2] + in.y * values[5] + in.z * values[8]);
-        return new Vector(x, y, z);
+        return new Vector3(x, y, z);
     }
     
 }
