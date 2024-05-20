@@ -1,12 +1,15 @@
 package controller.globe;
 
 import java.awt.Color;
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
 
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 
 import eutil.colors.EColors;
+import eutil.datatypes.boxes.Box2;
 import eutil.datatypes.util.EList;
 
 public class PerspectiveRenderer {
@@ -68,9 +71,11 @@ public class PerspectiveRenderer {
      * @param canvas   The graphics context to draw to
      */
     public void render(Camera camera, EList<Entity> entities, BufferedImage canvas) {
+        nearPlane = new Vector3(0.0f, 0.0f, 0.002f);
         prepareRenderer(camera);
-        EList<Triangle> toDraw = tessellateEntities(camera, entities);
-        draw(toDraw, canvas);
+        Box2<EList<Vector3>, EList<Triangle>> toDraw = tessellateEntities(camera, entities);
+        drawTriangles(toDraw.getB(), canvas);
+        drawLines(toDraw.getA(), canvas);
     }
     
     /**
@@ -148,12 +153,47 @@ public class PerspectiveRenderer {
         t.calculatedLighting = dp;
     }
     
-    private EList<Triangle> tessellateEntities(Camera camera, EList<Entity> entities) {
-        EList<Triangle> tessellated = EList.newList();
+    private Box2<EList<Vector3>, EList<Triangle>> tessellateEntities(Camera camera, EList<Entity> entities) {
+        EList<Vector3> tessellatedPoints = EList.newList();
+        EList<Triangle> tessellatedTriangles = EList.newList();
         for (Entity e : entities) {
-            tessellated.addAll(tessellate(camera, e));
+            tessellatedPoints.addAll(tessellatePoints(camera, e));
+            tessellatedTriangles.addAll(tessellateTriangles(camera, e));
         }
-        return tessellated;
+        return new Box2(tessellatedPoints, tessellatedTriangles);
+    }
+    
+    /**
+     * Performs initial model tesslation, world transformations, normal
+     * culling, lighting and plane clipping.
+     * 
+     * @param  camera The camera viewing the given model
+     * @param  entity The model to render
+     * 
+     * @return The entity model's tessellated points
+     */
+    private EList<Vector3> tessellatePoints(Camera camera, Entity entity) {
+        EList<Vector3> r = EList.newList();
+        
+        // tessellate points
+        for (var point : entity.model.points) {
+            // world transform
+            Vector3 transformed = makeTransform(entity).multiply(point);
+            Vector3 viewed = view.multiply(transformed);
+            Vector3 projected = projection.multiply(viewed);
+            // scale into view
+            projected = projected.div(projected.w);
+            // x/y are inverted so put them back
+            projected.x *= -1.0f; projected.y *= -1.0f;
+            // offset vert into visible normalized space
+            projected = projected.add(offsetView);
+            projected.x *= 0.5f * currentWidth;
+            projected.y *= 0.5f * currentHeight;
+            
+            r.add(projected);
+        }
+        
+        return r;
     }
     
     /**
@@ -165,8 +205,10 @@ public class PerspectiveRenderer {
      * 
      * @return The entity model's tessellated triangles
      */
-    private EList<Triangle> tessellate(Camera camera, Entity entity) {
+    private EList<Triangle> tessellateTriangles(Camera camera, Entity entity) {
         EList<Triangle> r = EList.newList();
+        
+        // tessellate triangles
         for (var tri : entity.model.triangles) {
             // world transform
             Triangle transformed = transformTriangle(entity, tri);
@@ -189,10 +231,25 @@ public class PerspectiveRenderer {
                 r.add(projectToScreen(clipped[i], projection, offsetView, currentWidth, currentHeight));
             }
         }
+        
         return r;
     }
     
-    private void draw(EList<Triangle> triangles, BufferedImage canvas) {
+    private void drawLines(EList<Vector3> points, BufferedImage canvas) {
+        Vector3 last = null;
+        //System.out.println(points);
+        for (Vector3 p : points) {
+            //EList<Triangle> clipped = p.clipAgainstScreen(currentWidth, currentHeight);
+            //for (Triangle c : clipped) {
+            if (last != null) {
+                rasterizeLine(last.x, last.y, last.z, p.x, p.y, p.z, 2.0f, canvas);
+            }
+            //}
+            last = p;
+        }
+    }
+    
+    private void drawTriangles(EList<Triangle> triangles, BufferedImage canvas) {
         for (Triangle t : triangles) {
             EList<Triangle> clipped = t.clipAgainstScreen(currentWidth, currentHeight);
             for (Triangle c : clipped) {
@@ -202,8 +259,13 @@ public class PerspectiveRenderer {
         }
     }
     
-    private void rasterizeLine(int startX, int startY, int startZ, int endX, int endY, int endZ, int lineWidth) {
-        
+    private void rasterizeLine(float startX, float startY, float startZ,
+                               float endX, float endY, float endZ,
+                               float lineWidth, BufferedImage canvas)
+    {
+        Graphics2D g2d = canvas.createGraphics();
+        g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        g2d.drawLine((int) startX, (int) startY, (int) endX, (int) endY);
     }
     
     private void rasterizeTriangle(Triangle t, BufferedImage canvas) {

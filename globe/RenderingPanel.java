@@ -244,6 +244,12 @@ public class RenderingPanel extends JPanel implements KeyListener, MouseListener
         cube1.setPosition(20.0f, 0.0f, 20.0f);
         cube2.setPosition(20.0f, 0.0f, 15.0f);
         
+        Line3D line11 = new Line3D();
+        line11.addPoint(7.25f, 0.0f, 7.25f);
+        line11.addPoint(10.5f, 0.5f, 11.5f);
+        line11.addPoint(11.0f, 2.0f, 12.0f);
+        Entity line1 = new Entity("Line1", line11);
+        
         //Shape doom1 = load("doom_E1M1.obj");
         //addShape(doom1);
         
@@ -254,6 +260,7 @@ public class RenderingPanel extends JPanel implements KeyListener, MouseListener
 //        addEntity(teapot);
 //        addEntity(cube1);
 //        addEntity(cube2);
+        addEntity(line1);
         
         renderer.onScreenResized(imgWidth, imgHeight);
         

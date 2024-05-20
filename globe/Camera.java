@@ -67,6 +67,7 @@ public class Camera {
         Vector3 p = new Vector3(position);
         float distToCenter = (float) Math.sqrt((p.x * p.x) + (p.y * p.y) + (p.z * p.z));
         float speedModifier = (float) ((Math.pow(distToCenter, Math.E) / 100.0f) - 5.3f);
+        //float speedModifier = (float) ((Math.pow(distToCenter, Math.E) / 10.0f) - 0.09f);
         speedModifier = ENumUtil.clamp(speedModifier, 0.1f, 200f);
         float amount = 0.01f * speedModifier;
         float rotAmount = 2f;
