@@ -1,5 +1,6 @@
 package controller.globe;
 
+import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
@@ -11,6 +12,7 @@ import org.joml.Vector3f;
 import eutil.colors.EColors;
 import eutil.datatypes.boxes.Box2;
 import eutil.datatypes.util.EList;
+import eutil.math.ENumUtil;
 
 public class PerspectiveRenderer {
     
@@ -71,7 +73,7 @@ public class PerspectiveRenderer {
      * @param canvas   The graphics context to draw to
      */
     public void render(Camera camera, EList<Entity> entities, BufferedImage canvas) {
-        nearPlane = new Vector3(0.0f, 0.0f, 0.002f);
+        nearPlane = new Vector3(0.0f, 0.0f, 0.005f);
         prepareRenderer(camera);
         Box2<EList<Vector3>, EList<Triangle>> toDraw = tessellateEntities(camera, entities);
         drawTriangles(toDraw.getB(), canvas);
@@ -265,6 +267,7 @@ public class PerspectiveRenderer {
     {
         Graphics2D g2d = canvas.createGraphics();
         g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        g2d.setStroke(new BasicStroke(3f));
         g2d.drawLine((int) startX, (int) startY, (int) endX, (int) endY);
     }
     
@@ -389,6 +392,8 @@ public class PerspectiveRenderer {
                     
                     int x = (int) ((texU / texW) * (float) texWidth);
                     int y = (int) ((texV / texW) * (float) texHeight);
+                    x = ENumUtil.clamp(x, 0, texWidth - 1);
+                    y = ENumUtil.clamp(y, 0, texHeight - 1);
                     int rgb = tri.texture.getRGB(x, y);
                     int color = EColors.changeBrightness(rgb, (int) (tri.calculatedLighting * 255f));
                     float depth = calculateDepth(j, i, tri, area);
@@ -440,13 +445,15 @@ public class PerspectiveRenderer {
                 float tstep = 1.0f / ((float) (bx - ax));
                 float t = 0.0f;
                 
-                for (int j = ax; j < bx; j++) {
+                for (int j = ax; j <= bx; j++) {
                     texU = (1.0f - t) * tsu + t * teu;
                     texV = (1.0f - t) * tsv + t * tev;
                     texW = (1.0f - t) * tsw + t * tew;
                     
                     int x = (int) ((texU / texW) * (float) texWidth);
                     int y = (int) ((texV / texW) * (float) texHeight);
+                    x = ENumUtil.clamp(x, 0, texWidth - 1);
+                    y = ENumUtil.clamp(y, 0, texHeight - 1);
                     int rgb = tri.texture.getRGB(x, y);
                     int color = EColors.changeBrightness(rgb, (int) (tri.calculatedLighting * 255f));
                     float depth = calculateDepth(j, i, tri, area);

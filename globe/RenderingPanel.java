@@ -40,6 +40,7 @@ public class RenderingPanel extends JPanel implements KeyListener, MouseListener
     private Cursor standard;
     private Cursor hidden;
     
+    private int renderScale = 50;
     private int imgWidth = 320;
     private int imgHeight = 240;
     
@@ -105,6 +106,9 @@ public class RenderingPanel extends JPanel implements KeyListener, MouseListener
         String fov = "FOV: " + renderer.getFOV();
         var fovGV = g2.getFont().createGlyphVector(g2.getFontRenderContext(), fov);
         g2.drawString(fov, 0, (int) fovGV.getVisualBounds().getHeight() * 4);
+        String quality = "Q: " + renderScale;
+        var qGV = g2.getFont().createGlyphVector(g2.getFontRenderContext(), quality);
+        g2.drawString(quality, 0, (int) qGV.getVisualBounds().getHeight() * 5);
         
         // draw crosshair
         int midX = getWidth() / 2;
@@ -167,9 +171,17 @@ public class RenderingPanel extends JPanel implements KeyListener, MouseListener
     
     @Override
     public void mouseWheelMoved(MouseWheelEvent e) {
-        float fov = renderer.getFOV() + e.getWheelRotation() * 2f;
-        fov = ENumUtil.clamp(fov, 1f, 120f);
-        renderer.setFOV(fov);
+        if (e.isControlDown()) {
+            renderScale += e.getWheelRotation() * -2;
+            renderScale = ENumUtil.clamp(renderScale, 1, 100);
+            setup();
+        }
+        else {
+            float fov = renderer.getFOV() + e.getWheelRotation() * 2f;
+            fov = ENumUtil.clamp(fov, 1f, 120f);
+            renderer.setFOV(fov);
+        }
+
         repaint();
     }
 
@@ -208,9 +220,16 @@ public class RenderingPanel extends JPanel implements KeyListener, MouseListener
     public void setup() {
         entities.clear();
         
+        imgWidth = 16 * renderScale;
+        imgHeight = 9 * renderScale;
+        
+        //imgWidth = 256; imgHeight = 144;
         //imgWidth = 320; imgHeight = 240;
-        //imgWidth = 640; imgHeight = 480;
-        imgWidth = 1080; imgHeight = 720;
+        //imgWidth = 480; imgHeight = 270; // 30
+        //imgWidth = 640; imgHeight = 360; // 40
+        //imgWidth = 800; imgHeight = 450; // 50
+        
+        //imgWidth = 1280; imgHeight = 720;
         //imgWidth = 1920; imgHeight = 1080;
         
         Sphere starsModel = new Sphere(100000.0f, 10, 10, Test3DWindow.stars);
@@ -220,7 +239,8 @@ public class RenderingPanel extends JPanel implements KeyListener, MouseListener
         stars.setRotationDegrees(-90f, 0, 0);
         stars.setPosition(0, 0, 0);
         
-        Sphere planetModel = new Sphere(10.0f, 50, 50, Test3DWindow.worldBig);
+        Sphere planetModel = new Sphere(10.0f, 70, 70, Test3DWindow.worldBig);
+        //Sphere planetModel = new Sphere(10.0f, 50, 50, null);
         planetModel.fullBright = true;
         Entity planet = new Entity("Planet", planetModel);
         planet.setRotationDegrees(-90.0f, 180f, 0.0f);
@@ -260,7 +280,7 @@ public class RenderingPanel extends JPanel implements KeyListener, MouseListener
 //        addEntity(teapot);
 //        addEntity(cube1);
 //        addEntity(cube2);
-        addEntity(line1);
+        //addEntity(line1);
         
         renderer.onScreenResized(imgWidth, imgHeight);
         
