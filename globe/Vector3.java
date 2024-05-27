@@ -1,5 +1,7 @@
 package controller.globe;
 
+import java.text.DecimalFormat;
+
 public class Vector3 {
     
     //========
@@ -31,7 +33,8 @@ public class Vector3 {
     
     @Override
     public String toString() {
-        return "<" + x + ", " + y + ", " + z + ">";
+        var df = new DecimalFormat("#.##");
+        return "<" + df.format(x) + ", " + df.format(y) + ", " + df.format(z) + ">";
     }
     
     //=========
@@ -54,16 +57,16 @@ public class Vector3 {
     public float dot(Vector3 v) { return x*v.x + y*v.y + z*v.z; }
     public float len() { return (float) Math.sqrt(dot(this)); }
     
-    public static float calculateIntersectionPoint(Vector3 p, Vector3 n, Vector3 lineStart, Vector3 lineEnd) {
-        n = n.norm();
-        float d = -n.dot(p);
-        float ad = lineStart.dot(n);
-        float bd = lineEnd.dot(n);
+    public static float calculateIntersectionPoint(Vector3 plane, Vector3 normal, Vector3 lineStart, Vector3 lineEnd) {
+        normal = normal.norm();
+        float d = -normal.dot(plane);
+        float ad = lineStart.dot(normal);
+        float bd = lineEnd.dot(normal);
         return (-d - ad) / (bd - ad);
     }
     
-    public static Vector3 intersectPlane(Vector3 p, Vector3 n, Vector3 lineStart, Vector3 lineEnd) {
-        float t = calculateIntersectionPoint(p, n, lineStart, lineEnd);
+    public static Vector3 intersectPlane(Vector3 plane, Vector3 normal, Vector3 lineStart, Vector3 lineEnd) {
+        float t = calculateIntersectionPoint(plane, normal, lineStart, lineEnd);
         return intersectPlane(lineStart, lineEnd, t);
     }
     

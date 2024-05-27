@@ -128,12 +128,12 @@ public class RenderingPanel extends JPanel implements KeyListener, MouseListener
 //        Point2d i = new Point2d(1100, 400);
 //        Point2d j = new Point2d(1200, 300);
 //        var line = new BezierLine(a, b, c, d, e, f, h, i, j);
-//        //line.setDrawControlPoints(true);
-//        //line.setDrawStepDots(true);
-//        //line.setStepDotColor(Color.cyan);
-//        //line.setStepDotSize(5);
+//        line.setDrawControlPoints(true);
+//        line.setDrawStepDots(true);
+//        line.setStepDotColor(Color.cyan);
+//        line.setStepDotSize(5);
 //        line.setLineWidth(2);
-//        line.draw(g2);
+//        line.draw(g2, 80);
     }
     
     @Override
@@ -172,13 +172,15 @@ public class RenderingPanel extends JPanel implements KeyListener, MouseListener
     @Override
     public void mouseWheelMoved(MouseWheelEvent e) {
         if (e.isControlDown()) {
-            renderScale += e.getWheelRotation() * -2;
-            renderScale = ENumUtil.clamp(renderScale, 1, 100);
+            renderScale += e.getWheelRotation() * -1;
+            renderScale = ENumUtil.clamp(renderScale, 1, 120);
             setup();
         }
         else {
-            float fov = renderer.getFOV() + e.getWheelRotation() * 2f;
-            fov = ENumUtil.clamp(fov, 1f, 120f);
+            float scale = 1.00f;
+            if (e.isAltDown()) scale = 0.1f;
+            float fov = renderer.getFOV() + e.getWheelRotation() * scale;
+            fov = ENumUtil.clamp(fov, 0.1f, 120f);
             renderer.setFOV(fov);
         }
 
@@ -217,10 +219,11 @@ public class RenderingPanel extends JPanel implements KeyListener, MouseListener
         setCursor((val) ? hidden : standard);
     }
     
+    @SuppressWarnings("unused")
     public void setup() {
         entities.clear();
         
-        imgWidth = 16 * renderScale;
+        imgWidth = 21 * renderScale;
         imgHeight = 9 * renderScale;
         
         //imgWidth = 256; imgHeight = 144;
@@ -232,19 +235,19 @@ public class RenderingPanel extends JPanel implements KeyListener, MouseListener
         //imgWidth = 1280; imgHeight = 720;
         //imgWidth = 1920; imgHeight = 1080;
         
-        Sphere starsModel = new Sphere(100000.0f, 10, 10, Test3DWindow.stars);
+        Sphere starsModel = new Sphere(200000.0f, 10, 10, Test3DWindow.stars);
         starsModel.insideOut = true;
         starsModel.fullBright = true;
         Entity stars = new Entity("Stars", starsModel);
         stars.setRotationDegrees(-90f, 0, 0);
         stars.setPosition(0, 0, 0);
         
-        Sphere planetModel = new Sphere(10.0f, 70, 70, Test3DWindow.worldBig);
+        Sphere planetModel = new Sphere(1.0f, 70, 70, Test3DWindow.worldBig);
         //Sphere planetModel = new Sphere(10.0f, 50, 50, null);
         planetModel.fullBright = true;
-        Entity planet = new Entity("Planet", planetModel);
-        planet.setRotationDegrees(-90.0f, 180f, 0.0f);
-        planet.setPosition(0, 0, 0);
+        Entity earth = new Entity("Planet", planetModel);
+        earth.setRotationDegrees(-90.0f, 180f, 0.0f);
+        
         
         Model axisModel = Test3DWindow.loadModel("axis.obj");
         Model mountainsModel = Test3DWindow.loadModel("mountains.obj");
@@ -268,19 +271,110 @@ public class RenderingPanel extends JPanel implements KeyListener, MouseListener
         line11.addPoint(7.25f, 0.0f, 7.25f);
         line11.addPoint(10.5f, 0.5f, 11.5f);
         line11.addPoint(11.0f, 2.0f, 12.0f);
+        line11.lineColor = Color.GREEN;
         Entity line1 = new Entity("Line1", line11);
+        line11.antiAlias = true;
+        line11.lineWidth = 1;
         
         //Shape doom1 = load("doom_E1M1.obj");
         //addShape(doom1);
         
+//        Sphere sunModel = new Sphere(1.0f, 70, 70, Test3DWindow.sun);
+//        Sphere mercuryModel = new Sphere(1.0f, 70, 70, Test3DWindow.mercury);
+//        Sphere venusModel = new Sphere(1.0f, 70, 70, Test3DWindow.venus);
+//        Sphere marsModel = new Sphere(1.0f, 70, 70, Test3DWindow.mars);
+//        Sphere jupiterModel = new Sphere(1.0f, 70, 70, Test3DWindow.jupiter);
+//        Sphere saturnModel = new Sphere(1.0f, 70, 70, Test3DWindow.saturn);
+//        Sphere uranusModel = new Sphere(1.0f, 70, 70, Test3DWindow.uranus);
+//        Sphere neptuneModel = new Sphere(1.0f, 70, 70, Test3DWindow.neptune);
+//        Sphere moonModel = new Sphere(1.0f, 70, 70, Test3DWindow.moon);
+        
+//        Entity sun = new Entity("sun", sunModel);
+//        Entity mercury = new Entity("mercury", mercuryModel);
+//        Entity venus = new Entity("venus", venusModel);
+//        Entity mars = new Entity("mars", marsModel);
+//        Entity jupiter = new Entity("jupiter", jupiterModel);
+//        Entity saturn = new Entity("saturn", saturnModel);
+//        Entity uranus = new Entity("uranus", uranusModel);
+//        Entity neptune = new Entity("neptune", neptuneModel);
+//        Entity moon = new Entity("moon", moonModel);
+        
+//        sun.setRotationDegrees(-90f, 0, 0);
+//        mercury.setRotationDegrees(-90f, 0, 0);
+//        venus.setRotationDegrees(-90f, 0, 0);
+//        mars.setRotationDegrees(-90f, 0, 0);
+//        jupiter.setRotationDegrees(-90f, 0, 0);
+//        saturn.setRotationDegrees(-90f, 0, 0);
+//        uranus.setRotationDegrees(-90f, 0, 0);
+//        neptune.setRotationDegrees(-90f, 0, 0);
+//        moon.setRotationDegrees(-90f, 0, 0);
+//        
+//        sunModel.fullBright = true;
+//        mercuryModel.fullBright = true;
+//        venusModel.fullBright = true;
+//        marsModel.fullBright = true;
+//        jupiterModel.fullBright = true;
+//        saturnModel.fullBright = true;
+//        uranusModel.fullBright = true;
+//        neptuneModel.fullBright = true;
+        
+//        sun.setScale(10f * 109f);
+//        mercury.setScale(10f * 0.383f);
+//        venus.setScale(10f * 0.9499f);
+        earth.setScale(10f);
+//        moon.setScale(10f * 0.27f);
+//        mars.setScale(10f * 0.53f);
+//        jupiter.setScale(10f * 11.2f);
+//        saturn.setScale(10f * 9.5f);
+//        uranus.setScale(10f * 4.007f);
+//        neptune.setScale(10f * 3.9f);
+//        
+//        sun.setPosition(10f * 11727.8144f, 0f, 0f);
+//        mercury.setPosition(10f * 7188.4439f, 0, 0);
+//        venus.setPosition(10f * 3245.5315f, 0, 0);
+        earth.setPosition(0f, 0f, 0f);
+//        moon.setPosition(-10f * 30f, 0f, 0f);
+//        mars.setPosition(-10f * 6146.1273f, 0, 0);
+//        jupiter.setPosition(-10f * 49302.2891f, 0, 0);
+//        saturn.setPosition(-10f * 100533.0825f, 0, 0);
+//        uranus.setPosition(-10f * 213029.1627f, 0, 0);
+//        neptune.setPosition(-10f * 342223.2675f, 0, 0);
+        
         addEntity(stars);
+//        addEntity(sun);
+//        addEntity(mercury);
+//        addEntity(venus);
+        addEntity(earth);
+//        addEntity(moon);
+//        addEntity(mars);
+//        addEntity(jupiter);
+//        addEntity(saturn);
+//        addEntity(uranus);
+//        addEntity(neptune);
+
 //        addEntity(axis);
-        addEntity(planet);
 //        addEntity(mountains);
 //        addEntity(teapot);
 //        addEntity(cube1);
 //        addEntity(cube2);
         //addEntity(line1);
+        
+        Line3D axisXLine = new Line3D(Color.RED);
+        axisXLine.addPoint(-100f, 0, 0);
+        axisXLine.addPoint(100f, 0, 0);
+        Line3D axisYLine = new Line3D(Color.GREEN);
+        axisYLine.addPoint(0, -100f, 0);
+        axisYLine.addPoint(0, 100f, 0);
+        Line3D axisZLine = new Line3D(Color.BLUE);
+        axisZLine.addPoint(0, 0, -100f);
+        axisZLine.addPoint(0, 0, 100f);
+        
+        Entity axisX = new Entity(axisXLine);
+        Entity axisY = new Entity(axisYLine);
+        Entity axisZ = new Entity(axisZLine);
+        //addEntity(axisX);
+        addEntity(axisY);
+        //addEntity(axisZ);
         
         renderer.onScreenResized(imgWidth, imgHeight);
         

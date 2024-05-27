@@ -1,9 +1,6 @@
 package controller.globe;
 
-import java.awt.BasicStroke;
 import java.awt.Color;
-import java.awt.Graphics2D;
-import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
 
 import org.joml.Matrix4f;
@@ -11,6 +8,7 @@ import org.joml.Vector3f;
 
 import eutil.colors.EColors;
 import eutil.datatypes.boxes.Box2;
+import eutil.datatypes.boxes.BoxList;
 import eutil.datatypes.util.EList;
 import eutil.math.ENumUtil;
 
@@ -33,8 +31,17 @@ public class PerspectiveRenderer {
     private Vector3 cameraFront;
     
     private Vector3 nearPlane = new Vector3(0.0f, 0.0f, 0.01f);
-    private Vector3 farPlane = new Vector3(0.0f, 0.0f, 1.0f);
+    private Vector3 farPlane = new Vector3(0.0f, 0.0f, 1000.0f);
+    private final Vector3 nearNorm = new Vector3(0.0f, 0.0f, 1.0f);
+    private final Vector3 farNorm = new Vector3(0.0f, 0.0f, -1.0f);
     private Vector3 offsetView = new Vector3(1, 1, 0);
+    
+    private final Vector3 top = new Vector3(0.0f, 0.0f, 0.0f);
+    private final Vector3 left = new Vector3(0.0f, 0.0f, 0.0f);
+    private final Vector3 topNormal = new Vector3(0.0f, 1.0f, 0.0f);
+    private final Vector3 botNormal = new Vector3(0.0f, -1.0f, 0.0f);
+    private final Vector3 leftNormal = new Vector3(1.0f, 0.0f, 0.0f);
+    private final Vector3 rightNormal = new Vector3(-1.0f, 0.0f, 0.0f);
     
     private float nearPlaneDist = 0.1f;
     private float farPlaneDist = 1000.0f;
@@ -73,9 +80,11 @@ public class PerspectiveRenderer {
      * @param canvas   The graphics context to draw to
      */
     public void render(Camera camera, EList<Entity> entities, BufferedImage canvas) {
-        nearPlane = new Vector3(0.0f, 0.0f, 0.005f);
+        nearPlane = new Vector3(0.0f, 0.0f, 0.01f);
+        lightDirection = new Vector3(1.0f, 0.3f, 0.0f).norm();
+        
         prepareRenderer(camera);
-        Box2<EList<Vector3>, EList<Triangle>> toDraw = tessellateEntities(camera, entities);
+        Box2<BoxList<Entity, EList<Vector3>>, BoxList<Entity, EList<Triangle>>> toDraw = tessellateEntities(camera, entities);
         drawTriangles(toDraw.getB(), canvas);
         drawLines(toDraw.getA(), canvas);
     }
@@ -155,12 +164,12 @@ public class PerspectiveRenderer {
         t.calculatedLighting = dp;
     }
     
-    private Box2<EList<Vector3>, EList<Triangle>> tessellateEntities(Camera camera, EList<Entity> entities) {
-        EList<Vector3> tessellatedPoints = EList.newList();
-        EList<Triangle> tessellatedTriangles = EList.newList();
+    private Box2<BoxList<Entity, EList<Vector3>>, BoxList<Entity, EList<Triangle>>> tessellateEntities(Camera camera, EList<Entity> entities) {
+        BoxList<Entity, EList<Vector3>> tessellatedPoints = new BoxList<>();
+        BoxList<Entity, EList<Triangle>> tessellatedTriangles = new BoxList<>();
         for (Entity e : entities) {
-            tessellatedPoints.addAll(tessellatePoints(camera, e));
-            tessellatedTriangles.addAll(tessellateTriangles(camera, e));
+            tessellatedPoints.add(e, projectPoints(camera, e));
+            tessellatedTriangles.add(e, projectTriangles(camera, e));
         }
         return new Box2(tessellatedPoints, tessellatedTriangles);
     }
@@ -174,25 +183,36 @@ public class PerspectiveRenderer {
      * 
      * @return The entity model's tessellated points
      */
-    private EList<Vector3> tessellatePoints(Camera camera, Entity entity) {
+    private EList<Vector3> projectPoints(Camera camera, Entity entity) {
         EList<Vector3> r = EList.newList();
+        
+        Vector3 lastViewed = null;
         
         // tessellate points
         for (var point : entity.model.points) {
             // world transform
             Vector3 transformed = makeTransform(entity).multiply(point);
             Vector3 viewed = view.multiply(transformed);
-            Vector3 projected = projection.multiply(viewed);
-            // scale into view
-            projected = projected.div(projected.w);
-            // x/y are inverted so put them back
-            projected.x *= -1.0f; projected.y *= -1.0f;
-            // offset vert into visible normalized space
-            projected = projected.add(offsetView);
-            projected.x *= 0.5f * currentWidth;
-            projected.y *= 0.5f * currentHeight;
             
-            r.add(projected);
+            if (lastViewed != null) {
+                Box2<Vector3, Vector3> clipped = Line3D.clipLineAgainstPlane(nearPlane, nearNorm, lastViewed, viewed);
+                if (clipped != null) {
+                    Vector3 a = clipped.getA();
+                    Vector3 b = clipped.getB();
+                    r.add(projectToScreen(a));
+                    r.add(projectToScreen(b));
+                }
+                
+//                clipped = Line3D.clipLineAgainstPlane(farPlane, farNorm, lastViewed, viewed);
+//                if (clipped != null) {
+//                    Vector3 a = clipped.getA();
+//                    Vector3 b = clipped.getB();
+//                    r.add(projectToScreen(a));
+//                    r.add(projectToScreen(b));
+//                }
+            }
+            
+            lastViewed = viewed;
         }
         
         return r;
@@ -207,7 +227,7 @@ public class PerspectiveRenderer {
      * 
      * @return The entity model's tessellated triangles
      */
-    private EList<Triangle> tessellateTriangles(Camera camera, Entity entity) {
+    private EList<Triangle> projectTriangles(Camera camera, Entity entity) {
         EList<Triangle> r = EList.newList();
         
         // tessellate triangles
@@ -227,48 +247,183 @@ public class PerspectiveRenderer {
             
             // transform from world space into view space and clip view triangle
             // against near plane, this could form two additional triangles
-            Triangle[] clipped = view.multiply(transformed).clipAgainstPlane(nearPlane, farPlane);
-            for (int i = 0; i < clipped.length; i++) {
+            transformed = view.multiply(transformed);
+            EList<Triangle> clipped = EList.newList();
+            clipped.addA(transformed.clipAgainstPlane(nearPlane, nearNorm));
+            //clipped.addA(transformed.clipAgainstPlane(new Vector3(0.0f, 0.0f, 1.0f), new Vector3(0, 0, -1)));
+            for (int i = 0; i < clipped.size(); i++) {
                 // project from 3D to 2D and transform triangle position/dimensions to screen space
-                r.add(projectToScreen(clipped[i], projection, offsetView, currentWidth, currentHeight));
+                r.add(projectToScreen(clipped.get(i)));
             }
         }
         
         return r;
     }
     
-    private void drawLines(EList<Vector3> points, BufferedImage canvas) {
-        Vector3 last = null;
-        //System.out.println(points);
-        for (Vector3 p : points) {
-            //EList<Triangle> clipped = p.clipAgainstScreen(currentWidth, currentHeight);
-            //for (Triangle c : clipped) {
-            if (last != null) {
-                rasterizeLine(last.x, last.y, last.z, p.x, p.y, p.z, 2.0f, canvas);
+    private void drawLines(BoxList<Entity, EList<Vector3>> lines, BufferedImage canvas) {
+        final Vector3 bot = new Vector3(0.0f, currentHeight - 1, 0.0f);
+        final Vector3 right = new Vector3(currentWidth - 1, 0.0f, 0.0f);
+        
+        for (Box2<Entity, EList<Vector3>> box : lines) {
+            if (!(box.getA().getModel() instanceof Line3D)) continue;
+            
+            Line3D lineModel = (Line3D) box.getA().getModel();
+            EList<Vector3> points = box.getB();
+            Vector3 last = null;
+            
+            for (Vector3 p : points) {
+                if (last != null) {
+                    for (int i = 0; i < 4; i++) {
+                        Box2<Vector3, Vector3> clipped = null;
+                        
+                        // clip it against a plane
+                        switch (i) {
+                        case 0: clipped = Line3D.clipLineAgainstPlane(left , leftNormal , last, p); break;
+                        case 1: clipped = Line3D.clipLineAgainstPlane(bot  , botNormal  , last, p); break;
+                        case 2: clipped = Line3D.clipLineAgainstPlane(right, rightNormal, last, p); break;
+                        case 3: clipped = Line3D.clipLineAgainstPlane(top  , topNormal  , last, p); break;
+                        }
+                        
+                        if (clipped != null) {
+                            Vector3 a = clipped.getA();
+                            Vector3 b = clipped.getB();
+                            if (lineModel.antiAlias) rasterizeAALine(a, b, lineModel.lineWidth, lineModel.lineColor, canvas);
+                            else rasterizeLine(a, b, lineModel.lineWidth, lineModel.lineColor, canvas);
+//                            var g2d = canvas.createGraphics();
+//                            g2d.setColor(Color.MAGENTA);
+//                            g2d.fillOval((int) a.x - 8, (int) a.y - 8, 16, 16);
+//                            g2d.fillOval((int) b.x - 8, (int) b.y - 8, 16, 16);
+                        }
+                    }
+                }
+                last = p;
             }
+        }
+    }
+    
+    private void drawTriangles(BoxList<Entity, EList<Triangle>> entityTriangles, BufferedImage canvas) {
+        for (Box2<Entity, EList<Triangle>> box : entityTriangles) {
+            @SuppressWarnings("unused")
+            Entity e = box.getA();
+            EList<Triangle> triangles = box.getB();
+            
+            for (Triangle t : triangles) {
+                EList<Triangle> clipped = t.clipAgainstScreen(currentWidth, currentHeight);
+                for (Triangle c : clipped) {
+                    if (c.texture != null) rasterizeTexturedTriangle(c, canvas);
+                    else rasterizeTriangle(c, canvas);
+                }
+            }
+        }
+    }
+    
+    private void rasterizeLine(Vector3 start, Vector3 end, int lineWidth, Color color, BufferedImage canvas) {
+        final int w = currentWidth;
+        final int h = currentHeight;
+        int baseColor = color.getRGB();
+        
+        for (int i = 0; i < (int) lineWidth; i++) {
+            int mx = 0, my = i;
+            //if (Math.abs(end.x - start.x) < Math.abs(end.y - start.y)) {
+            //    mx = i;
+            //    my = 0;
             //}
-            last = p;
-        }
-    }
-    
-    private void drawTriangles(EList<Triangle> triangles, BufferedImage canvas) {
-        for (Triangle t : triangles) {
-            EList<Triangle> clipped = t.clipAgainstScreen(currentWidth, currentHeight);
-            for (Triangle c : clipped) {
-                if (c.texture != null) rasterizeTexturedTriangle(c, canvas);
-                else rasterizeTriangle(c, canvas);
+            
+            int x0 = (int) start.x + mx;
+            int y0 = (int) start.y + my;
+            int x1 = (int) end.x + mx;
+            int y1 = (int) end.y + my;
+            
+            int dx =  Math.abs(x1 - x0), sx = (x0 < x1) ? 1 : -1;
+            int dy = -Math.abs(y1 - y0), sy = (y0 < y1) ? 1 : -1;
+            int err = dx + dy, e2;
+            
+//            System.out.println(x0 + " : " + x1 + " : " + y0 + " : " + y1);
+            //System.out.println(dx + " : " + dy);
+            
+            while (true) {
+                if (x0 == x1 && y0 == y1) break;
+                if (x0 >= 0 && x0 < w && y0 >= 0 && y0 < h) {
+                    float tx = ENumUtil.clamp((x0 - start.x) / (end.x - start.x), 0.0f, 1.0f);
+                    float ty = ENumUtil.clamp((y0 - start.y) / (end.y - start.y), 0.0f, 1.0f);
+                    float t = (tx + ty) / 2;
+                    //float t = tx;
+                    float depth = (end.z - start.z) * t + start.z;
+                    System.out.println("DRAW: " + x0 + " : " + y0 + " | " + tx + " : " + ty + " : " + t + " : " + depth);
+                    drawPixel(x0, y0, baseColor, depth, canvas);
+                }
+                e2 = 2 * err;
+                if (e2 > dy) { err += dy; x0 += sx; }
+                if (e2 < dx) { err += dx; y0 += sy; }
             }
         }
     }
     
-    private void rasterizeLine(float startX, float startY, float startZ,
-                               float endX, float endY, float endZ,
-                               float lineWidth, BufferedImage canvas)
-    {
-        Graphics2D g2d = canvas.createGraphics();
-        g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-        g2d.setStroke(new BasicStroke(3f));
-        g2d.drawLine((int) startX, (int) startY, (int) endX, (int) endY);
+    /** Rasterize an anti-aliased line of variable width. */
+    private void rasterizeAALine(Vector3 start, Vector3 end, float lineWidth, Color color, BufferedImage canvas) {
+        final int w = currentWidth;
+        final int h = currentHeight;
+        final int baseColor = color.getRGB();
+        
+        int x0 = (int) start.x;
+        int y0 = (int) start.y;
+        int x1 = (int) end.x;
+        int y1 = (int) end.y;
+        
+        final int dx = Math.abs(x1 - x0), sx = (x0 < x1) ? 1 : -1;
+        final int dy = Math.abs(y1 - y0), sy = (y0 < y1) ? 1 : -1;
+        final float ed = (dx + dy == 0) ? 1.0f : (float) Math.sqrt(dx * dx + dy * dy);
+        int err = dx + dy, e2, x2, y2;
+        int alpha, rgb;
+        
+        //System.out.println("\nLINE");
+        final float wd = (lineWidth + 1) / 2.0f;
+        while (true) {
+            float tx = (x0 - start.x) / (end.x - start.x);
+            float ty = (y0 - start.y) / (end.y - start.y);
+            float t = (tx + ty) / 2;
+            float depth = (end.z - start.z) * t + start.z;
+            
+            if (x0 >= 0 && x0 < w && y0 >= 0 && y0 < h) {
+                alpha = (int) Math.max(0, 255 - 255.0f * Math.abs(err - dx + dy) / ed - wd + 1);
+                //System.out.println(err + " : " + dx + " : " + dy + " => " + alpha);
+                rgb = EColors.changeOpacity(baseColor, alpha);
+                drawPixel(x0, y0, rgb, depth, canvas);
+            }
+            
+            e2 = err;
+            x2 = x0;
+            
+            if (2 * e2 >= -dx) {
+                for (e2 += dy, y2 = y0; (e2 < (ed * wd)) && (y1 != y2 || dx > dy); e2 += dx) {
+                    y2 += sy;
+                    if (x0 >= 0 && x0 < w && y2 >= 0 && y2 < h) {
+                        alpha = (int) Math.max(0, 255 - 255.0f * Math.abs(e2) / ed - wd + 1);
+                        //System.out.println("alpha: " + alpha);
+                        rgb = EColors.changeOpacity(baseColor, alpha);
+                        drawPixel(x0, y2, rgb, depth, canvas);
+                    }
+                }
+                if (x0 == x1) break;
+                //System.out.println("ERR: " + err);
+                e2 = err;
+                err -= dy;
+                x0 += sx;
+            }
+            if (2 * e2 <= dy) {
+                for (e2 = dx - e2; (e2 < (ed * wd)) && (x1 != x2 || dx < dy); e2 += dy) {
+                    x2 += sx;
+                    if (x2 >= 0 && x2 < w && y0 >= 0 && y0 < h) {
+                        alpha = (int) Math.max(0, 255.0f * Math.abs(e2) / ed - wd + 1);
+                        rgb = EColors.changeOpacity(baseColor, alpha);
+                        //drawPixel(x2, y0, rgb, depth, canvas);
+                    }
+                }
+                if (y0 == y1) break;
+                err += dx;
+                y0 += sy;
+            }
+        }
     }
     
     private void rasterizeTriangle(Triangle t, BufferedImage canvas) {
@@ -279,7 +434,7 @@ public class PerspectiveRenderer {
         int minY = (int) Math.max(0, Math.ceil(Math.min(v0.y, Math.min(v1.y, v2.y))));
         int maxY = (int) Math.min(currentHeight - 1, Math.floor(Math.max(v0.y, Math.max(v1.y, v2.y))));
         
-        float triangleArea = calcuateArea(t);
+        float triangleArea = (v0.y - v2.y) * (v1.x - v2.x) + (v1.y - v2.y) * (v2.x - v0.x);
         
         for (int y = minY; y <= maxY; y++) {
             for (int x = minX; x <= maxX; x++) {
@@ -507,9 +662,7 @@ public class PerspectiveRenderer {
         return m;
     }
     
-    private static Triangle projectToScreen(Triangle tri, Matrix4 projection, Vector3 offsetView,
-                                           int screenWidth, int screenHeight)
-    {
+    private Triangle projectToScreen(Triangle tri) {
         Triangle t = projection.multiply(tri);
         
         t.v0.tex.x = t.v0.tex.x / t.v0.pos.w;
@@ -524,8 +677,36 @@ public class PerspectiveRenderer {
         t.v1.tex.w = 1.0f / t.v1.pos.w;
         t.v2.tex.w = 1.0f / t.v2.pos.w;
         
-        t.positionInWindow(offsetView, screenWidth, screenHeight);
+        // scale into view
+        t.v0.pos = t.v0.pos.div(t.v0.pos.w);
+        t.v1.pos = t.v1.pos.div(t.v1.pos.w);
+        t.v2.pos = t.v2.pos.div(t.v2.pos.w);
+        // x/y are inverted so put them back
+        t.v0.pos.x *= -1.0f; t.v0.pos.y *= -1.0f;
+        t.v1.pos.x *= -1.0f; t.v1.pos.y *= -1.0f;
+        t.v2.pos.x *= -1.0f; t.v2.pos.y *= -1.0f;
+        // offset verts into visible normalized space
+        t.v0.pos = t.v0.pos.add(offsetView);
+        t.v1.pos = t.v1.pos.add(offsetView);
+        t.v2.pos = t.v2.pos.add(offsetView);
+        t.v0.pos.x *= 0.5f * currentWidth; t.v0.pos.y *= 0.5f * currentHeight;
+        t.v1.pos.x *= 0.5f * currentWidth; t.v1.pos.y *= 0.5f * currentHeight;
+        t.v2.pos.x *= 0.5f * currentWidth; t.v2.pos.y *= 0.5f * currentHeight;
+        
         return t;
+    }
+    
+    private Vector3 projectToScreen(Vector3 point) {
+        Vector3 p = projection.multiply(point);
+        // scale into view
+        p = p.div(p.w);
+        // x/y are inverted so put them back
+        p.x *= -1.0f; p.y *= -1.0f;
+        // offset vert into visible normalized space
+        p = p.add(offsetView);
+        p.x *= 0.5f * currentWidth;
+        p.y *= 0.5f * currentHeight;
+        return p;
     }
     
     private static Color getShade(Color color, float shade) {

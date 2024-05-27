@@ -37,6 +37,14 @@ public class Entity {
         rotation.set((float) Math.toRadians(x), (float) Math.toRadians(y), (float) Math.toRadians(z));
     }
     
+    public void setScale(float x, float y, float z) {
+        scale.set(x, y, z);
+    }
+    
+    public void setScale(float s) {
+        scale.set(s, s, s);
+    }
+    
     //=========
     // Getters
     //=========

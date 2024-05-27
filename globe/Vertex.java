@@ -21,6 +21,10 @@ public class Vertex {
         this(new Vector3(v.pos), new Vector2(v.tex));
     }
     
+    public Vertex(Vector3 v) {
+        this(new Vector3(v), new Vector2());
+    }
+    
     public Vertex(float x, float y, float z) {
         this(new Vector3(x, y, z), new Vector2());
     }

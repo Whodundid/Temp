@@ -27,6 +27,15 @@ public class Test3DWindow extends JFrame {
     public static BufferedImage world;
     public static BufferedImage worldBig;
     public static BufferedImage stars;
+    public static BufferedImage moon;
+    public static BufferedImage sun;
+    public static BufferedImage mercury;
+    public static BufferedImage venus;
+    public static BufferedImage mars;
+    public static BufferedImage jupiter;
+    public static BufferedImage saturn;
+    public static BufferedImage uranus;
+    public static BufferedImage neptune;
     
     //==============
     // Constructors
@@ -42,6 +51,15 @@ public class Test3DWindow extends JFrame {
             world = ImageIO.read(getClass().getResource("/world.topo.bathy.200408x294x196.jpg"));
             worldBig = ImageIO.read(getClass().getResource("/world.topo.bathy.200408.3x21600x10800.png"));
             stars = ImageIO.read(getClass().getResource("/stars_darker.jpg"));
+//            moon = ImageIO.read(getClass().getResource("/2k_moon.jpg"));
+//            sun = ImageIO.read(getClass().getResource("/2k_sun.jpg"));
+//            mercury = ImageIO.read(getClass().getResource("/2k_mercury.jpg"));
+//            venus = ImageIO.read(getClass().getResource("/2k_venus_atmosphere.jpg"));
+//            mars = ImageIO.read(getClass().getResource("/2k_mars.jpg"));
+//            jupiter = ImageIO.read(getClass().getResource("/2k_jupiter.jpg"));
+//            saturn = ImageIO.read(getClass().getResource("/2k_saturn.jpg"));
+//            uranus = ImageIO.read(getClass().getResource("/2k_uranus.jpg"));
+//            neptune = ImageIO.read(getClass().getResource("/2k_neptune.jpg"));
         }
         catch (IOException e) {
             e.printStackTrace();
