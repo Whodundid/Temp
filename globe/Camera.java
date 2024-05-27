@@ -19,7 +19,7 @@ public class Camera {
     //==============
     
     public Camera() {
-        this(new Vector3(), new Vector3());
+        this(new Vector3(0, 0, 30), new Vector3());
     }
     
     public Camera(float x, float y, float z) {
@@ -72,15 +72,19 @@ public class Camera {
         float amount = 0.01f * speedModifier;
         float rotAmount = 2f;
         
+        amount = 0.11f;
+        
         float y$1 = (float) Math.sin(Math.toRadians(rotation.x));
         float y$2 = (float) Math.cos(Math.toRadians(rotation.x));
         
         float y = y$1 * amount;
-        float x = (float) Math.sin(Math.toRadians(rotation.y)) * amount * y$2;
-        float z = (float) Math.cos(Math.toRadians(rotation.y)) * amount * y$2;
+        float x = (float) Math.sin(Math.toRadians(rotation.y)) * amount;
+        float z = (float) Math.cos(Math.toRadians(rotation.y)) * amount;
+        float wsx = x * y$2;
+        float wsz = z * y$2;
         
-        if (e.getKeyCode() == KeyEvent.VK_W) move(x, y, -z);
-        if (e.getKeyCode() == KeyEvent.VK_S) move(-x, -y, z);
+        if (e.getKeyCode() == KeyEvent.VK_W) move(wsx, y, -wsz);
+        if (e.getKeyCode() == KeyEvent.VK_S) move(-wsx, -y, wsz);
         if (e.getKeyCode() == KeyEvent.VK_A) move(-z, 0, -x);
         if (e.getKeyCode() == KeyEvent.VK_D) move(z, 0, x);
         if (e.getKeyCode() == KeyEvent.VK_SPACE) move(0, amount, 0);

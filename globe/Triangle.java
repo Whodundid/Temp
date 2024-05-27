@@ -11,10 +11,10 @@ public class Triangle extends Model {
     // Fields
     //========
     
-    public BufferedImage texture;
     public Vertex v0;
     public Vertex v1;
     public Vertex v2;
+    public BufferedImage texture;
     public Color color = Color.WHITE;
     public float calculatedLighting = 1.0f;
     
@@ -35,9 +35,21 @@ public class Triangle extends Model {
         calculatedLighting = t.calculatedLighting;
     }
     
+    public Triangle(Vertex v0, Vertex v1, Vertex v2) {
+        this(v0, v1, v2, Color.WHITE);
+    }
+    
+    public Triangle(Vector3 v0, Vector3 v1, Vector3 v2) {
+        this(new Vertex(v0), new Vertex(v1), new Vertex(v2));
+    }
+    
     public Triangle(Vertex v0, Vertex v1, Vertex v2, Color color) {
         set(v0, v1, v2, color);
         triangles.add(this);
+    }
+    
+    public Triangle(Vector3 v0, Vector3 v1, Vector3 v2, Color color) {
+        this(new Vertex(v0), new Vertex(v1), new Vertex(v2), color);
     }
     
     public Triangle(Vertex v0, Vertex v1, Vertex v2, BufferedImage texture) {
@@ -161,34 +173,15 @@ public class Triangle extends Model {
         return normal.dot(cameraRay);
     }
     
-    public Triangle positionInWindow(Vector3 offsetView, float width, float height) {
-        // scale into view
-        v0.pos = v0.pos.div(v0.pos.w);
-        v1.pos = v1.pos.div(v1.pos.w);
-        v2.pos = v2.pos.div(v2.pos.w);
-        // x/y are inverted so put them back
-        v0.pos.x *= -1.0f; v0.pos.y *= -1.0f;
-        v1.pos.x *= -1.0f; v1.pos.y *= -1.0f;
-        v2.pos.x *= -1.0f; v2.pos.y *= -1.0f;
-        // offset verts into visible normalized space
-        v0.pos = v0.pos.add(offsetView);
-        v1.pos = v1.pos.add(offsetView);
-        v2.pos = v2.pos.add(offsetView);
-        v0.pos.x *= 0.5f * width; v0.pos.y *= 0.5f * height;
-        v1.pos.x *= 0.5f * width; v1.pos.y *= 0.5f * height;
-        v2.pos.x *= 0.5f * width; v2.pos.y *= 0.5f * height;
-        return this;
-    }
-    
-    public Triangle[] clipAgainstPlane(Vector3 p, Vector3 n) {
+    public Triangle[] clipAgainstPlane(Vector3 plane, Vector3 normal) {
         // make sure plane is normal
-        n = n.norm();
+        normal = normal.norm();
         
         // return signed shortest distance from point to plane, plane normal must be normalized
-        float dotNP = n.dot(p);
-        float d0 = (n.x * v0.pos.x + n.y * v0.pos.y + n.z * v0.pos.z - dotNP);
-        float d1 = (n.x * v1.pos.x + n.y * v1.pos.y + n.z * v1.pos.z - dotNP);
-        float d2 = (n.x * v2.pos.x + n.y * v2.pos.y + n.z * v2.pos.z - dotNP);
+        float dotNP = normal.dot(plane);
+        float d0 = (normal.x * v0.pos.x + normal.y * v0.pos.y + normal.z * v0.pos.z - dotNP);
+        float d1 = (normal.x * v1.pos.x + normal.y * v1.pos.y + normal.z * v1.pos.z - dotNP);
+        float d2 = (normal.x * v2.pos.x + normal.y * v2.pos.y + normal.z * v2.pos.z - dotNP);
         
         Vector3[] vin = new Vector3[3];
         Vector2[] tin = new Vector2[3];
@@ -212,12 +205,12 @@ public class Triangle extends Model {
             out.color = color;
             out.texture = texture;
             out.calculatedLighting = calculatedLighting;
-            float t1 = Vector3.calculateIntersectionPoint(p, n, vin[0], vout[0]);
+            float t1 = Vector3.calculateIntersectionPoint(plane, normal, vin[0], vout[0]);
             out.v1.pos = Vector3.intersectPlane(vin[0], vout[0], t1);
             out.v1.tex.x = t1 * (tout[0].x - tin[0].x) + tin[0].x;
             out.v1.tex.y = t1 * (tout[0].y - tin[0].y) + tin[0].y;
             out.v1.tex.w = t1 * (tout[0].w - tin[0].w) + tin[0].w;
-            float t2 = Vector3.calculateIntersectionPoint(p, n, vin[0], vout[1]);
+            float t2 = Vector3.calculateIntersectionPoint(plane, normal, vin[0], vout[1]);
             out.v2.pos = Vector3.intersectPlane(vin[0], vout[1], t2);
             out.v2.tex.x = t2 * (tout[1].x - tin[0].x) + tin[0].x;
             out.v2.tex.y = t2 * (tout[1].y - tin[0].y) + tin[0].y;
@@ -235,7 +228,7 @@ public class Triangle extends Model {
             out1.color = color;
             out1.texture = texture;
             out1.calculatedLighting = calculatedLighting;
-            float t1 = Vector3.calculateIntersectionPoint(p, n, vin[0], vout[0]);
+            float t1 = Vector3.calculateIntersectionPoint(plane, normal, vin[0], vout[0]);
             out1.v2.pos = Vector3.intersectPlane(vin[0], vout[0], t1);
             out1.v2.tex.x = t1 * (tout[0].x - tin[0].x) + tin[0].x;
             out1.v2.tex.y = t1 * (tout[0].y - tin[0].y) + tin[0].y;
@@ -249,7 +242,7 @@ public class Triangle extends Model {
             out2.color = color;
             out2.texture = texture;
             out2.calculatedLighting = calculatedLighting;
-            float t2 = Vector3.calculateIntersectionPoint(p, n, vin[1], vout[0]);
+            float t2 = Vector3.calculateIntersectionPoint(plane, normal, vin[1], vout[0]);
             out2.v2.pos = Vector3.intersectPlane(vin[1], vout[0], t2);
             out2.v2.tex.x = t2 * (tout[0].x - tin[1].x) + tin[1].x;
             out2.v2.tex.y = t2 * (tout[0].y - tin[1].y) + tin[1].y;
