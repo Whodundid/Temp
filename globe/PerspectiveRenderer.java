@@ -317,6 +317,30 @@ public class PerspectiveRenderer {
         }
     }
     
+    private static int blend(int src_color, int dst_color) {
+        float src_a = ((src_color >> 24) & 0xFF) / 255f;
+        float src_r = ((src_color >> 16) & 0xFF) / 255f;
+        float src_g = ((src_color >> 8) & 0xFF) / 255f;
+        float src_b = ((src_color) & 0xFF) / 255f;
+        
+        float dst_a = ((dst_color >> 24) & 0xFF) / 255f;
+        float dst_r = ((dst_color >> 16) & 0xFF) / 255f;
+        float dst_g = ((dst_color >> 8) & 0xFF) / 255f;
+        float dst_b = ((dst_color) & 0xFF) / 255f;
+        
+        float out_a = (src_a * src_a) + (dst_a * (1 - src_a));
+        float out_r = (src_r * src_a) + (dst_r * (1 - src_a));
+        float out_g = (src_g * src_a) + (dst_g * (1 - src_a));
+        float out_b = (src_b * src_a) + (dst_b * (1 - src_a));
+        
+        out_a = (int) (out_a * 255f);
+        out_r = (int) (out_r * 255f);
+        out_g = (int) (out_g * 255f);
+        out_b = (int) (out_b * 255f);
+        
+        return ((int) out_a << 24) | ((int) out_r << 16) | ((int) out_g << 8) | (int) out_b;
+    }
+    
     private void rasterizeLine(Vector3 start, Vector3 end, int lineWidth, Color color, BufferedImage canvas) {
         final int w = currentWidth;
         final int h = currentHeight;
@@ -444,7 +468,12 @@ public class PerspectiveRenderer {
                 // only draw pixel if it is within the bounds of the triangle's vertices
                 if (b1 < 0 || b1 > 1 || b2 < 0 || b2 > 1 || b3 < 0 || b3 > 1) continue;
                 float depth = b1 * v0.z + b2 * v1.z + b3 * v2.z;
-                drawPixel(x, y, t.color.getRGB(), depth, canvas);
+                
+                int src = t.color.getRGB();
+                int dst = canvas.getRGB(x, y);
+                int out = blend(src, dst);
+                
+                drawPixel(x, y, out, depth, canvas);
             }
         }
     }
@@ -550,9 +579,11 @@ public class PerspectiveRenderer {
                     x = ENumUtil.clamp(x, 0, texWidth - 1);
                     y = ENumUtil.clamp(y, 0, texHeight - 1);
                     int rgb = tri.texture.getRGB(x, y);
-                    int color = EColors.changeBrightness(rgb, (int) (tri.calculatedLighting * 255f));
+                    int src = EColors.changeBrightness(rgb, (int) (tri.calculatedLighting * 255f));
+                    int dst = canvas.getRGB(x, y);
+                    int out = blend(src, dst);
                     float depth = calculateDepth(j, i, tri, area);
-                    drawPixel(j, i, color, depth, canvas);
+                    drawPixel(j, i, out, depth, canvas);
                     
                     t += tstep;
                 }
@@ -610,9 +641,11 @@ public class PerspectiveRenderer {
                     x = ENumUtil.clamp(x, 0, texWidth - 1);
                     y = ENumUtil.clamp(y, 0, texHeight - 1);
                     int rgb = tri.texture.getRGB(x, y);
-                    int color = EColors.changeBrightness(rgb, (int) (tri.calculatedLighting * 255f));
+                    int src = EColors.changeBrightness(rgb, (int) (tri.calculatedLighting * 255f));
+                    int dst = canvas.getRGB(x, y);
+                    int out = blend(src, dst);
                     float depth = calculateDepth(j, i, tri, area);
-                    drawPixel(j, i, color, depth, canvas);
+                    drawPixel(j, i, out, depth, canvas);
                     
                     t += tstep;
                 }
