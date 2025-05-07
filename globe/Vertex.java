@@ -7,8 +7,7 @@ public class Vertex {
     //========
     
     public Vector3 pos;
-    public Vector2 tex;
-    
+    public Vector2 tex;    
     //==============
     // Constructors
     //==============
@@ -36,8 +35,7 @@ public class Vertex {
     public Vertex(Vector3 position, Vector2 texture) {
         this.pos = position;
         this.tex = texture;
-    }
-    
+    }    
     //===========
     // Overrides
     //===========

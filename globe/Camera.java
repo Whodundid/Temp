@@ -12,8 +12,7 @@ public class Camera {
     //========
     
     public final Vector3 position;
-    public final Vector3 rotation;
-    
+    public final Vector3 rotation;    
     //==============
     // Constructors
     //==============
@@ -33,8 +32,7 @@ public class Camera {
     public Camera(Vector3 positionIn, Vector3 rotationIn) {
         position = positionIn;
         rotation = rotationIn;
-    }
-    
+    }    
     //=========
     // Methods
     //=========
@@ -47,7 +45,9 @@ public class Camera {
         rotation.addT(rotX, rotY, rotZ);
         rotation.x = ENumUtil.clamp(rotation.x, -90.0f, 90.0f);
         rotation.y %= 360.0;
+        rotation.z %= 360.0;
         if (rotation.y < 0) rotation.y += 360.0f;
+        if (rotation.z < 0) rotation.z += 360.0f;
     }
     
     public void reset() {
@@ -66,13 +66,14 @@ public class Camera {
     public void onKeyPressed(KeyEvent e) {
         Vector3 p = new Vector3(position);
         float distToCenter = (float) Math.sqrt((p.x * p.x) + (p.y * p.y) + (p.z * p.z));
-        float speedModifier = (float) ((Math.pow(distToCenter, Math.E) / 100.0f) - 5.3f);
+        float speedModifier = (float) ((Math.pow(distToCenter, Math.E) / 100.0f) - 5.0f);
         //float speedModifier = (float) ((Math.pow(distToCenter, Math.E) / 10.0f) - 0.09f);
-        speedModifier = ENumUtil.clamp(speedModifier, 0.1f, 200f);
-        float amount = 0.01f * speedModifier;
+        speedModifier = ENumUtil.clamp(speedModifier, 0.01f, 200f);
+        //float amount = 0.01f * speedModifier;
+        float amount = 0.5f;
         float rotAmount = 2f;
         
-        amount = 0.11f;
+        //amount = 0.11f;
         
         float y$1 = (float) Math.sin(Math.toRadians(rotation.x));
         float y$2 = (float) Math.cos(Math.toRadians(rotation.x));
@@ -93,6 +94,8 @@ public class Camera {
         if (e.getKeyCode() == KeyEvent.VK_DOWN) updateLook(-rotAmount, 0, 0);
         if (e.getKeyCode() == KeyEvent.VK_RIGHT) updateLook(0, rotAmount, 0);
         if (e.getKeyCode() == KeyEvent.VK_LEFT) updateLook(0, -rotAmount, 0);
+        if (e.getKeyCode() == KeyEvent.VK_E) updateLook(0, 0, -rotAmount);
+        if (e.getKeyCode() == KeyEvent.VK_Q) updateLook(0, 0, rotAmount);
     }
     
     public void onMouseMoved(MouseEvent e) {

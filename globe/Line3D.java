@@ -17,8 +17,7 @@ public class Line3D extends Model {
     public boolean antiAlias = false;
     
     private Vector3 first = null;
-    private Vector3 last = null;
-    
+    private Vector3 last = null;    
     //==============
     // Constructors
     //==============
@@ -26,8 +25,7 @@ public class Line3D extends Model {
     public Line3D() { this(Color.WHITE); }
     public Line3D(Color lineColor) {
         this.lineColor = lineColor;
-    }
-    
+    }    
     //=========
     // Methods
     //=========
@@ -36,14 +34,14 @@ public class Line3D extends Model {
     public void addPoint(float x, float y, float z) {
         Vector3 p1 = new Vector3(x, y, z);
         
-        if (last != null) {
-            Vector3 p2 = new Vector3(x, y, z);
-            Triangle t = new Triangle(last, p1, p2);
-            triangles.add(t);
-        }
-        
-        if (first == null) first = p1;
-        else last = p1;
+//        if (last != null) {
+//            Vector3 p2 = new Vector3(x, y, z);
+//            Triangle t = new Triangle(last, p1, p2);
+//            triangles.add(t);
+//        }
+//        
+//        if (first == null) first = p1;
+//        else last = p1;
         
         points.add(p1);
     }

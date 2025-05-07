@@ -8,8 +8,7 @@ public class Vector2 {
     
     public float x;
     public float y;
-    public float w;
-    
+    public float w;    
     //==============
     // Constructors
     //==============
@@ -21,8 +20,7 @@ public class Vector2 {
         this.x = x;
         this.y = y;
         this.w = w;
-    }
-    
+    }    
     //===========
     // Overrides
     //===========
@@ -30,8 +28,7 @@ public class Vector2 {
     @Override
     public String toString() {
         return "<" + x + ", " + y + ">";
-    }
-    
+    }    
     //=========
     // Methods
     //=========

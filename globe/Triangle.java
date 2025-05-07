@@ -17,7 +17,7 @@ public class Triangle extends Model {
     public BufferedImage texture;
     public Color color = Color.WHITE;
     public float calculatedLighting = 1.0f;
-    
+    public boolean alwaysFaceCamera = false;    
     //==============
     // Constructors
     //==============
@@ -33,6 +33,7 @@ public class Triangle extends Model {
         color = t.color;
         texture = t.texture;
         calculatedLighting = t.calculatedLighting;
+        alwaysFaceCamera = t.alwaysFaceCamera;
     }
     
     public Triangle(Vertex v0, Vertex v1, Vertex v2) {
@@ -80,8 +81,7 @@ public class Triangle extends Model {
         v1 = new Vertex(v1x, v1y, v1z, t1u, t1v);
         v2 = new Vertex(v2x, v2y, v2z, t2u, t2v);
         this.texture = texture;
-    }
-    
+    }    
     //===========
     // Overrides
     //===========
@@ -89,8 +89,7 @@ public class Triangle extends Model {
     @Override
     public String toString() {
         return "T[" + v0 + ";" + v1 + ";" + v2 + ";" + color + "]";
-    }
-    
+    }    
     //=========
     // Getters
     //=========
@@ -123,8 +122,7 @@ public class Triangle extends Model {
     public float t1w() { return v1.tex.w; }
     public float t2x() { return v2.tex.x; }
     public float t2y() { return v2.tex.y; }
-    public float t2w() { return v2.tex.w; }
-    
+    public float t2w() { return v2.tex.w; }    
     //=========
     // Setters
     //=========
@@ -154,8 +152,7 @@ public class Triangle extends Model {
     
     public void setTexture(BufferedImage texture) {
         this.texture = texture;
-    }
-    
+    }    
     //=========
     // Methods
     //=========
@@ -205,6 +202,7 @@ public class Triangle extends Model {
             out.color = color;
             out.texture = texture;
             out.calculatedLighting = calculatedLighting;
+            out.alwaysFaceCamera = alwaysFaceCamera;
             float t1 = Vector3.calculateIntersectionPoint(plane, normal, vin[0], vout[0]);
             out.v1.pos = Vector3.intersectPlane(vin[0], vout[0], t1);
             out.v1.tex.x = t1 * (tout[0].x - tin[0].x) + tin[0].x;
@@ -228,6 +226,7 @@ public class Triangle extends Model {
             out1.color = color;
             out1.texture = texture;
             out1.calculatedLighting = calculatedLighting;
+            out1.alwaysFaceCamera = alwaysFaceCamera;
             float t1 = Vector3.calculateIntersectionPoint(plane, normal, vin[0], vout[0]);
             out1.v2.pos = Vector3.intersectPlane(vin[0], vout[0], t1);
             out1.v2.tex.x = t1 * (tout[0].x - tin[0].x) + tin[0].x;
@@ -242,6 +241,7 @@ public class Triangle extends Model {
             out2.color = color;
             out2.texture = texture;
             out2.calculatedLighting = calculatedLighting;
+            out2.alwaysFaceCamera = alwaysFaceCamera;
             float t2 = Vector3.calculateIntersectionPoint(plane, normal, vin[1], vout[0]);
             out2.v2.pos = Vector3.intersectPlane(vin[1], vout[0], t2);
             out2.v2.tex.x = t2 * (tout[0].x - tin[1].x) + tin[1].x;

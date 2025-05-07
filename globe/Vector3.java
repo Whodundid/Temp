@@ -11,8 +11,7 @@ public class Vector3 {
     public float x;
     public float y;
     public float z;
-    public float w;
-    
+    public float w;    
     //==============
     // Constructors
     //==============
@@ -25,8 +24,7 @@ public class Vector3 {
         this.y = y;
         this.z = z;
         this.w = w;
-    }
-    
+    }    
     //===========
     // Overrides
     //===========
@@ -35,8 +33,7 @@ public class Vector3 {
     public String toString() {
         var df = new DecimalFormat("#.##");
         return "<" + df.format(x) + ", " + df.format(y) + ", " + df.format(z) + ">";
-    }
-    
+    }    
     //=========
     // Methods
     //=========

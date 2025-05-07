@@ -45,8 +45,7 @@ public class BezierLine {
     /** Debug flag used to specify whether or not each t-step iteration's x/y coordinate dot will be drawn. */
     private boolean drawStepDots = false;
     /** Specifies whether or not the line will actually be drawn. */
-    private boolean drawLine = true;
-    
+    private boolean drawLine = true;    
     //==============
     // Constructors
     //==============
@@ -70,8 +69,7 @@ public class BezierLine {
         this.startX = startX;
         this.startY = startY;
         if (points != null) this.points.addA(points);
-    }
-    
+    }    
     //=========
     // Methods
     //=========
@@ -95,9 +93,10 @@ public class BezierLine {
      * Generates a specified number of curve step points based on the start, end
      * and all intermediate control points for this bezier curve line.
      * 
-     * @param  iterations The number of step points to create (higher => more detail)
+     * @param iterations The number of step points to create (higher => more
+     *                   detail)
      * 
-     * @return            EList<Point2d> Curve step points for this bezier curve
+     * @return EList<Point2d> Curve step points for this bezier curve
      */
     public EList<Point2d> generateCurvePoints(int iterations) {
         EList<Point2d> r = EList.newList();
@@ -151,8 +150,7 @@ public class BezierLine {
                 g2d.drawString(out, (int) p.x - 3 - len / 2, (int) p.y - 10);
             }
         }
-    }
-    
+    }    
     //=========
     // Getters
     //=========
@@ -165,8 +163,7 @@ public class BezierLine {
     public float getLineWidth() { return lineWidth; }
     public boolean isLineDrawn() { return drawLine; }
     public int getStepDotSize() { return stepDotSize; }
-    public Color getStepDotColor() { return stepDotColor; }
-    
+    public Color getStepDotColor() { return stepDotColor; }    
     //=========
     // Setters
     //=========

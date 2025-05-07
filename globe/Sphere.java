@@ -10,8 +10,7 @@ public class Sphere extends Model {
     //========
     
     public int stackCount = 30;
-    public int sectorCount = 50;
-    
+    public int sectorCount = 50;    
     //==============
     // Constructors
     //==============
@@ -20,12 +19,12 @@ public class Sphere extends Model {
     public Sphere(float radius) { this(radius, null); }
     public Sphere(BufferedImage texture) { this(1.0f, texture); }
     public Sphere(float radius, BufferedImage texture) { this(radius, 18, 36, texture); }
+    public Sphere(float radius, int stacks, int sectors) { this(radius, stacks, sectors, null); }
     public Sphere(float radius, int stacks, int sectors, BufferedImage texture) {
         stackCount = stacks;
         sectorCount = sectors;
         setup(radius, texture);
-    }
-    
+    }    
     //=========
     // Methods
     //=========

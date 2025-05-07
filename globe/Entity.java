@@ -13,8 +13,7 @@ public class Entity {
     public BufferedImage texture;
     public Vector3 position = new Vector3();
     public Vector3 rotation = new Vector3();
-    public Vector3 scale = new Vector3(1, 1, 1);
-    
+    public Vector3 scale = new Vector3(1, 1, 1);    
     //==============
     // Constructors
     //==============
@@ -23,8 +22,7 @@ public class Entity {
     public Entity(String name, Model model) {
         this.name = name;
         this.model = model;
-    }
-    
+    }    
     //=========
     // Methods
     //=========
@@ -43,8 +41,7 @@ public class Entity {
     
     public void setScale(float s) {
         scale.set(s, s, s);
-    }
-    
+    }    
     //=========
     // Getters
     //=========
