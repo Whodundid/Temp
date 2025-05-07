@@ -1,7 +1,10 @@
 package controller.globe;
 
 import java.awt.Color;
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
+import java.awt.image.DataBufferInt;
 
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
@@ -48,7 +51,9 @@ public class PerspectiveRenderer {
     private float fov = 90.0f;
     
     private Vector3 lightDirection;
-    
+    /** Super-Sample Anti-Aliasing --> Render at 2x canvas size and downscale to canvas. */
+    private boolean useSSAA = false;
+    private int[] pixelBuffer;    
     //==============
     // Constructors
     //==============
@@ -65,8 +70,7 @@ public class PerspectiveRenderer {
         
         cameraUp = new Vector3(cameraUpDefault);
         cameraFront = new Vector3(cameraFrontDefault);
-    }
-    
+    }    
     //=========
     // Methods
     //=========
@@ -79,14 +83,84 @@ public class PerspectiveRenderer {
      * @param entities The entities to render
      * @param canvas   The graphics context to draw to
      */
-    public void render(Camera camera, EList<Entity> entities, BufferedImage canvas) {
+    public void render(Camera camera, EList<Entity> entities, BufferedImage canvas, int screenWidth, int screenHeight, boolean useSSAA) {
+        if (screenWidth == 0 || screenHeight == 0 || canvas == null || canvas.getWidth() == 0 || canvas.getHeight() == 0) return;
         nearPlane = new Vector3(0.0f, 0.0f, 0.01f);
         lightDirection = new Vector3(1.0f, 0.3f, 0.0f).norm();
         
+        BufferedImage drawingCanvas = canvas;
+        boolean useMultithreadig = false;
+        WorkerThread[] threads = null;
+        
+        // Check if SSAA is enabled
+        if (useSSAA) {
+            // Create a larger image for SSAA. For example, 2x the current resolution
+            BufferedImage ssaaCanvas = new BufferedImage(currentWidth * 2, currentHeight * 2, BufferedImage.TYPE_INT_ARGB);
+            drawingCanvas = ssaaCanvas;
+        }
+
+        pixelBuffer = ((DataBufferInt) drawingCanvas.getRaster().getDataBuffer()).getData();
+        
+        // Render the scene to the larger canvas
         prepareRenderer(camera);
         Box2<BoxList<Entity, EList<Vector3>>, BoxList<Entity, EList<Triangle>>> toDraw = tessellateEntities(camera, entities);
-        drawTriangles(toDraw.getB(), canvas);
-        drawLines(toDraw.getA(), canvas);
+        if (useMultithreadig) {
+//            threads = new WorkerThread[4];
+//            BoxList<Entity, EList<Vector3>> lines = toDraw.getA();
+//            BoxList<Entity, EList<Triangle>> triangles = toDraw.getB();
+//            
+//            int totalLinePoints = 0;
+//            int totalTriangles = 0;
+//            
+//            for (var p : lines.getBVals()) {
+//                totalLinePoints += p.size();
+//            }
+//            for (var t : triangles.getBVals()) {
+//                totalTriangles += t.size();
+//            }
+//            
+//            int linePointsPerThread = totalLinePoints / threads.length;
+//            int trianglesPerThread = totalTriangles / threads.length;
+//            
+//            for (int i = 0; i < threads.length; i++) {
+//                BoxList<Entity, EList<Vector3>> workerLines = new BoxList<>();
+//                BoxList<Entity, EList<Triangle>> workerTriangles = new BoxList<>();
+//                
+//                if (linePointsPerThread > 0) {
+//                    for (int q = 0, curLineIndex = 0, linePointIndex = 0; q < linePointsPerThread; q++) {
+//                        Box2<Entity, EList<Vector3>> curLine = lines.get(curLineIndex);
+//                        
+//                    }
+//                }
+//                if (trianglesPerThread > 0) {
+//                    
+//                }
+//            }
+        }
+        else {
+            drawTriangles(toDraw.getB());
+            drawLines(toDraw.getA());
+        }
+        
+        // Downsample the image to fit the original canvas size
+        if (useSSAA) {
+            Graphics2D g2d = canvas.createGraphics();
+            g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+            g2d.drawImage(drawingCanvas, 0, 0, currentWidth, currentHeight, null);
+            g2d.dispose();
+        }
+    }
+    
+    private class WorkerThread implements Runnable {
+        private Box2<BoxList<Entity, EList<Vector3>>, BoxList<Entity, EList<Triangle>>> toDraw;
+        public WorkerThread(Box2<BoxList<Entity, EList<Vector3>>, BoxList<Entity, EList<Triangle>>> toDraw) {
+            this.toDraw = toDraw;
+        }
+        @Override
+        public void run() {
+            drawTriangles(toDraw.getB());
+            drawLines(toDraw.getA());
+        }
     }
     
     /**
@@ -100,8 +174,7 @@ public class PerspectiveRenderer {
         currentWidth = newWidth;
         currentHeight = newHeight;
         updateProjectionMatrix();
-    }
-    
+    }    
     //=========
     // Getters
     //=========
@@ -110,8 +183,7 @@ public class PerspectiveRenderer {
     public float getNearPlaneDist() { return nearPlaneDist; }
     public float getFarPlaneDist() { return farPlaneDist; }
     public Matrix4 getProjectionMatrix() { return projection; }
-    public Matrix4 getViewMatrix() { return view; }
-    
+    public Matrix4 getViewMatrix() { return view; }    
     //=========
     // Setters
     //=========
@@ -233,14 +305,6 @@ public class PerspectiveRenderer {
                     r.add(projectToScreen(a));
                     r.add(projectToScreen(b));
                 }
-                
-//                clipped = Line3D.clipLineAgainstPlane(farPlane, farNorm, lastViewed, viewed);
-//                if (clipped != null) {
-//                    Vector3 a = clipped.getA();
-//                    Vector3 b = clipped.getB();
-//                    r.add(projectToScreen(a));
-//                    r.add(projectToScreen(b));
-//                }
             }
             
             lastViewed = viewed;
@@ -281,17 +345,19 @@ public class PerspectiveRenderer {
             transformed = view.multiply(transformed);
             EList<Triangle> clipped = EList.newList();
             clipped.addA(transformed.clipAgainstPlane(nearPlane, nearNorm));
-            //clipped.addA(transformed.clipAgainstPlane(new Vector3(0.0f, 0.0f, 1.0f), new Vector3(0, 0, -1)));
+            
             for (int i = 0; i < clipped.size(); i++) {
+                Triangle projected = projectToScreen(clipped.get(i));
+                
                 // project from 3D to 2D and transform triangle position/dimensions to screen space
-                r.add(projectToScreen(clipped.get(i)));
+                r.add(projected);
             }
         }
         
         return r;
     }
     
-    private void drawLines(BoxList<Entity, EList<Vector3>> lines, BufferedImage canvas) {
+    private void drawLines(BoxList<Entity, EList<Vector3>> lines) {
         final Vector3 bot = new Vector3(0.0f, currentHeight - 1, 0.0f);
         final Vector3 right = new Vector3(currentWidth - 1, 0.0f, 0.0f);
         
@@ -318,12 +384,8 @@ public class PerspectiveRenderer {
                         if (clipped != null) {
                             Vector3 a = clipped.getA();
                             Vector3 b = clipped.getB();
-                            if (lineModel.antiAlias) rasterizeAALine(a, b, lineModel.lineWidth, lineModel.lineColor, canvas);
-                            else rasterizeLine(a, b, lineModel.lineWidth, lineModel.lineColor, canvas);
-//                            var g2d = canvas.createGraphics();
-//                            g2d.setColor(Color.MAGENTA);
-//                            g2d.fillOval((int) a.x - 8, (int) a.y - 8, 16, 16);
-//                            g2d.fillOval((int) b.x - 8, (int) b.y - 8, 16, 16);
+                            if (lineModel.antiAlias) rasterizeAALine(a, b, lineModel.lineWidth, lineModel.lineColor);
+                            else rasterizeLine(a, b, lineModel.lineWidth, lineModel.lineColor);
                         }
                     }
                 }
@@ -332,7 +394,7 @@ public class PerspectiveRenderer {
         }
     }
     
-    private void drawTriangles(BoxList<Entity, EList<Triangle>> entityTriangles, BufferedImage canvas) {
+    private void drawTriangles(BoxList<Entity, EList<Triangle>> entityTriangles) {
         for (Box2<Entity, EList<Triangle>> box : entityTriangles) {
             @SuppressWarnings("unused")
             Entity e = box.getA();
@@ -341,24 +403,20 @@ public class PerspectiveRenderer {
             for (Triangle t : triangles) {
                 EList<Triangle> clipped = t.clipAgainstScreen(currentWidth, currentHeight);
                 for (Triangle c : clipped) {
-                    if (c.texture != null) rasterizeTexturedTriangle(c, canvas);
-                    else rasterizeTriangle(c, canvas);
+                    if (c.texture != null) rasterizeTexturedTriangle(c);
+                    else rasterizeTriangle(c);
                 }
             }
         }
     }
     
-    private void rasterizeLine(Vector3 start, Vector3 end, int lineWidth, Color color, BufferedImage canvas) {
+    private void rasterizeLine(Vector3 start, Vector3 end, int lineWidth, Color color) {
         final int w = currentWidth;
         final int h = currentHeight;
         int baseColor = color.getRGB();
         
         for (int i = 0; i < (int) lineWidth; i++) {
             int mx = 0, my = i;
-            //if (Math.abs(end.x - start.x) < Math.abs(end.y - start.y)) {
-            //    mx = i;
-            //    my = 0;
-            //}
             
             int x0 = (int) start.x + mx;
             int y0 = (int) start.y + my;
@@ -369,9 +427,6 @@ public class PerspectiveRenderer {
             int dy = -Math.abs(y1 - y0), sy = (y0 < y1) ? 1 : -1;
             int err = dx + dy, e2;
             
-//            System.out.println(x0 + " : " + x1 + " : " + y0 + " : " + y1);
-            //System.out.println(dx + " : " + dy);
-            
             while (true) {
                 if (x0 == x1 && y0 == y1) break;
                 if (x0 >= 0 && x0 < w && y0 >= 0 && y0 < h) {
@@ -381,7 +436,7 @@ public class PerspectiveRenderer {
                     //float t = tx;
                     float depth = (end.z - start.z) * t + start.z;
                     System.out.println("DRAW: " + x0 + " : " + y0 + " | " + tx + " : " + ty + " : " + t + " : " + depth);
-                    drawPixel(x0, y0, baseColor, depth, canvas);
+                    drawPixel(x0, y0, baseColor, depth);
                 }
                 e2 = 2 * err;
                 if (e2 > dy) { err += dy; x0 += sx; }
@@ -391,7 +446,7 @@ public class PerspectiveRenderer {
     }
     
     /** Rasterize an anti-aliased line of variable width. */
-    private void rasterizeAALine(Vector3 start, Vector3 end, float lineWidth, Color color, BufferedImage canvas) {
+    private void rasterizeAALine(Vector3 start, Vector3 end, float lineWidth, Color color) {
         final int w = currentWidth;
         final int h = currentHeight;
         final int baseColor = color.getRGB();
@@ -414,7 +469,7 @@ public class PerspectiveRenderer {
             float t = (tx + ty) / 2;
             float depth = (end.z - start.z) * t + start.z;
             
-            drawPixel(x0, y0, baseColor, depth, canvas);
+            drawPixel(x0, y0, baseColor, depth);
             if (x0 == x1 && y0 == y1) break;
             
             e2 = 2 * err;
@@ -431,31 +486,31 @@ public class PerspectiveRenderer {
         
     }
     
-    public static int blend(int src_color, int dst_color) {
-        float src_a = ((src_color >> 24) & 0xFF) / 255f;
-        float src_r = ((src_color >> 16) & 0xFF) / 255f;
-        float src_g = ((src_color >> 8) & 0xFF) / 255f;
-        float src_b = ((src_color) & 0xFF) / 255f;
-        
-        float dst_a = ((dst_color >> 24) & 0xFF) / 255f;
-        float dst_r = ((dst_color >> 16) & 0xFF) / 255f;
-        float dst_g = ((dst_color >> 8) & 0xFF) / 255f;
-        float dst_b = ((dst_color) & 0xFF) / 255f;
-        
-        float out_a = (src_a * src_a) + (dst_a * (1 - src_a));
-        float out_r = (src_r * src_a) + (dst_r * (1 - src_a));
-        float out_g = (src_g * src_a) + (dst_g * (1 - src_a));
-        float out_b = (src_b * src_a) + (dst_b * (1 - src_a));
-        
-        out_a = (int) (out_a * 255f);
-        out_r = (int) (out_r * 255f);
-        out_g = (int) (out_g * 255f);
-        out_b = (int) (out_b * 255f);
-        
-        return ((int) out_a << 24) | ((int) out_r << 16) | ((int) out_g << 8) | (int) out_b;
+    public static int blend(int src, int dst) {
+        int srcA = (src >>> 24);
+        if (srcA == 255) return src; // fully opaque — just overwrite
+        if (srcA == 0) return dst;   // fully transparent — do nothing
+
+        int invA = 255 - srcA;
+
+        int srcR = (src >> 16) & 0xFF;
+        int srcG = (src >> 8) & 0xFF;
+        int srcB = src & 0xFF;
+
+        int dstR = (dst >> 16) & 0xFF;
+        int dstG = (dst >> 8) & 0xFF;
+        int dstB = dst & 0xFF;
+        int dstA = (dst >>> 24);
+
+        int outR = (srcR * srcA + dstR * invA) / 255;
+        int outG = (srcG * srcA + dstG * invA) / 255;
+        int outB = (srcB * srcA + dstB * invA) / 255;
+        int outA = (srcA * srcA + dstA * invA) / 255;
+
+        return (outA << 24) | (outR << 16) | (outG << 8) | outB;
     }
     
-    private void rasterizeTriangle(Triangle t, BufferedImage canvas) {
+    private void rasterizeTriangle(Triangle t) {
         Vector3 v0 = t.v0.pos, v1 = t.v1.pos, v2 = t.v2.pos;
         
         int minX = (int) Math.max(0, Math.ceil(Math.min(v0.x, Math.min(v1.x, v2.x))));
@@ -474,15 +529,16 @@ public class PerspectiveRenderer {
                 if (b1 < 0 || b1 > 1 || b2 < 0 || b2 > 1 || b3 < 0 || b3 > 1) continue;
                 float depth = b1 * v0.z + b2 * v1.z + b3 * v2.z;
                 int rgb = t.color.getRGB();
-                drawPixel(x, y, rgb, depth, canvas);
+                drawPixel(x, y, rgb, depth);
             }
         }
     }
     
-    private void rasterizeTexturedTriangle(Triangle tri, BufferedImage canvas) {
+    private void rasterizeTexturedTriangle(Triangle tri) {
         final BufferedImage tex = tri.texture;
-        final int texWidth = tex.getWidth() - 1;
-        final int texHeight = tex.getHeight() - 1;
+        final int texWidth = tex.getWidth();
+        final int texHeight = tex.getHeight();
+        final float area = calcuateArea(tri);
         
         int x0 = (int) tri.v0.pos.x, y0 = (int) tri.v0.pos.y;
         int x1 = (int) tri.v1.pos.x, y1 = (int) tri.v1.pos.y;
@@ -490,162 +546,96 @@ public class PerspectiveRenderer {
         float u0 = tri.v0.tex.x, v0 = tri.v0.tex.y, w0 = tri.v0.tex.w;
         float u1 = tri.v1.tex.x, v1 = tri.v1.tex.y, w1 = tri.v1.tex.w;
         float u2 = tri.v2.tex.x, v2 = tri.v2.tex.y, w2 = tri.v2.tex.w;
-        
-        float area = calcuateArea(tri);
-        
+
+        float lighting = tri.calculatedLighting;
+
+        // Sort vertices by y
         if (y1 < y0) {
-            int ty = y0; y0 = y1; y1 = ty;
-            int tx = x0; x0 = x1; x1 = tx;
-            float tu = u0; u0 = u1; u1 = tu;
-            float tv = v0; v0 = v1; v1 = tv;
-            float tw = w0; w0 = w1; w1 = tw;
+            int t = y0; y0 = y1; y1 = t;
+                t = x0; x0 = x1; x1 = t;
+            float tf = u0; u0 = u1; u1 = tf;
+                  tf = v0; v0 = v1; v1 = tf;
+                  tf = w0; w0 = w1; w1 = tf;
         }
         if (y2 < y0) {
-            int ty = y0; y0 = y2; y2 = ty;
-            int tx = x0; x0 = x2; x2 = tx;
-            float tu = u0; u0 = u2; u2 = tu;
-            float tv = v0; v0 = v2; v2 = tv;
-            float tw = w0; w0 = w2; w2 = tw;
+            int t = y0; y0 = y2; y2 = t;
+                t = x0; x0 = x2; x2 = t;
+            float tf = u0; u0 = u2; u2 = tf;
+                  tf = v0; v0 = v2; v2 = tf;
+                  tf = w0; w0 = w2; w2 = tf;
         }
         if (y2 < y1) {
-            int ty = y1; y1 = y2; y2 = ty;
-            int tx = x1; x1 = x2; x2 = tx;
-            float tu = u1; u1 = u2; u2 = tu;
-            float tv = v1; v1 = v2; v2 = tv;
-            float tw = w1; w1 = w2; w2 = tw;
+            int t = y1; y1 = y2; y2 = t;
+                t = x1; x1 = x2; x2 = t;
+            float tf = u1; u1 = u2; u2 = tf;
+                  tf = v1; v1 = v2; v2 = tf;
+                  tf = w1; w1 = w2; w2 = tf;
         }
-        
-        int dx1 = x1 - x0;
-        int dy1 = y1 - y0;
-        float du1 = u1 - u0;
-        float dv1 = v1 - v0;
-        float dw1 = w1 - w0;
-        
-        int dx2 = (int) (x2 - x0);
-        int dy2 = (int) (y2 - y0);
-        float du2 = u2 - u0;
-        float dv2 = v2 - v0;
-        float dw2 = w2 - w0;
-        
-        float daxStep = 0, dbxStep = 0,
-              du1Step = 0, dv1Step = 0,
-              du2Step = 0, dv2Step = 0,
-              dw1Step = 0, dw2Step = 0;
-        
-        if (dy1 != 0) daxStep = dx1 / (float) Math.abs(dy1);
-        if (dy2 != 0) dbxStep = dx2 / (float) Math.abs(dy2);
-        
-        if (dy1 != 0) du1Step = du1 / (float) Math.abs(dy1);
-        if (dy1 != 0) dv1Step = dv1 / (float) Math.abs(dy1);
-        if (dy1 != 0) dw1Step = dw1 / (float) Math.abs(dy1);
-        
-        if (dy2 != 0) du2Step = du2 / (float) Math.abs(dy2);
-        if (dy2 != 0) dv2Step = dv2 / (float) Math.abs(dy2);
-        if (dy2 != 0) dw2Step = dw2 / (float) Math.abs(dy2);
-        
-        if (dy1 != 0) {
-            for (int i = y0; i <= y1; i++) {
-                int ax = (int) (x0 + (float) (i - y0) * daxStep);
-                int bx = (int) (x0 + (float) (i - y0) * dbxStep);
-                
-                float tsu = u0 + (float) (i - y0) * du1Step;
-                float tsv = v0 + (float) (i - y0) * dv1Step;
-                float tsw = w0 + (float) (i - y0) * dw1Step;
-                
-                float teu = u0 + (float) (i - y0) * du2Step;
-                float tev = v0 + (float) (i - y0) * dv2Step;
-                float tew = w0 + (float) (i - y0) * dw2Step;
-                
-                if (ax > bx) {
-                    int tx = ax; ax = bx; bx = tx;
-                    float tu = tsu; tsu = teu; teu = tu;
-                    float tv = tsv; tsv = tev; tev = tv;
-                    float tw = tsw; tsw = tew; tew = tw;
-                }
-                
-                float texU = tsu;
-                float texV = tsv;
-                float texW = tsw;
-                
-                float tstep = 1.0f / ((float) (bx - ax));
-                float t = 0.0f;
-                
-                for (int j = ax; j < bx; j++) {
-                    texU = (1.0f - t) * tsu + t * teu;
-                    texV = (1.0f - t) * tsv + t * tev;
-                    texW = (1.0f - t) * tsw + t * tew;
-                    
-                    int x = (int) ((texU / texW) * (float) texWidth);
-                    int y = (int) ((texV / texW) * (float) texHeight);
-                    x = ENumUtil.clamp(x, 0, texWidth - 1);
-                    y = ENumUtil.clamp(y, 0, texHeight - 1);
-                    int rgb = tri.texture.getRGB(x, y);
-                    int color = EColors.changeBrightness(rgb, (int) (tri.calculatedLighting * 255f));
-                    float depth = calculateDepth(j, i, tri, area);
-                    drawPixel(j, i, color, depth, canvas);
-                    
-                    t += tstep;
-                }
+
+        int totalHeight = y2 - y0;
+        for (int i = 0; i < totalHeight; i++) {
+            boolean secondHalf = i > y1 - y0 || y1 == y0;
+            int segmentHeight = secondHalf ? y2 - y1 : y1 - y0;
+            float alpha = (float) i / totalHeight;
+            float beta = (float) (i - (secondHalf ? y1 - y0 : 0)) / segmentHeight;
+
+            int ax = x0 + (int) ((x2 - x0) * alpha);
+            int bx = secondHalf
+                ? x1 + (int) ((x2 - x1) * beta)
+                : x0 + (int) ((x1 - x0) * beta);
+
+            float su = u0 + (u2 - u0) * alpha;
+            float sv = v0 + (v2 - v0) * alpha;
+            float sw = w0 + (w2 - w0) * alpha;
+
+            float eu = secondHalf
+                ? u1 + (u2 - u1) * beta
+                : u0 + (u1 - u0) * beta;
+
+            float ev = secondHalf
+                ? v1 + (v2 - v1) * beta
+                : v0 + (v1 - v0) * beta;
+
+            float ew = secondHalf
+                ? w1 + (w2 - w1) * beta
+                : w0 + (w1 - w0) * beta;
+
+            if (ax > bx) {
+                int t = ax; ax = bx; bx = t;
+                float tf;
+                tf = su; su = eu; eu = tf;
+                tf = sv; sv = ev; ev = tf;
+                tf = sw; sw = ew; ew = tf;
             }
-        }
-        
-        dx1 = x2 - x1;
-        dy1 = y2 - y1;
-        du1 = u2 - u1;
-        dv1 = v2 - v1;
-        dw1 = w2 - w1;
-        
-        if (dy1 != 0) daxStep = dx1 / (float) Math.abs(dy1);
-        if (dy2 != 0) dbxStep = dx2 / (float) Math.abs(dy2);
-        
-        du1Step = 0; dv1Step = 0;
-        if (dy1 != 0) du1Step = du1 / (float) Math.abs(dy1);
-        if (dy1 != 0) dv1Step = dv1 / (float) Math.abs(dy1);
-        if (dy1 != 0) dw1Step = dw1 / (float) Math.abs(dy1);
-        
-        if (dy1 != 0) {
-            for (int i = y1; i <= y2; i++) {
-                int ax = (int) (x1 + (float) (i - y1) * daxStep);
-                int bx = (int) (x0 + (float) (i - y0) * dbxStep);
-                
-                float tsu = u1 + (float) (i - y1) * du1Step;
-                float tsv = v1 + (float) (i - y1) * dv1Step;
-                float tsw = w1 + (float) (i - y1) * dw1Step;
-                
-                float teu = u0 + (float) (i - y0) * du2Step;
-                float tev = v0 + (float) (i - y0) * dv2Step;
-                float tew = w0 + (float) (i - y0) * dw2Step;
-                
-                if (ax > bx) {
-                    int tx = ax; ax = bx; bx = tx;
-                    float tu = tsu; tsu = teu; teu = tu;
-                    float tv = tsv; tsv = tev; tev = tv;
-                    float tw = tsw; tsw = tew; tew = tw;
-                }
-                
-                float texU = tsu;
-                float texV = tsv;
-                float texW = tsw;
-                
-                float tstep = 1.0f / ((float) (bx - ax));
-                float t = 0.0f;
-                
-                for (int j = ax; j <= bx; j++) {
-                    texU = (1.0f - t) * tsu + t * teu;
-                    texV = (1.0f - t) * tsv + t * tev;
-                    texW = (1.0f - t) * tsw + t * tew;
-                    
-                    int x = (int) ((texU / texW) * (float) texWidth);
-                    int y = (int) ((texV / texW) * (float) texHeight);
-                    x = ENumUtil.clamp(x, 0, texWidth - 1);
-                    y = ENumUtil.clamp(y, 0, texHeight - 1);
-                    int rgb = tri.texture.getRGB(x, y);
-                    int color = EColors.changeBrightness(rgb, (int) (tri.calculatedLighting * 255f));
-                    float depth = calculateDepth(j, i, tri, area);
-                    drawPixel(j, i, color, depth, canvas);
-                    
-                    t += tstep;
-                }
+
+            float step = bx != ax ? 1.0f / (bx - ax) : 0;
+            float t = 0;
+
+            int y = y0 + i;
+            if (y < 0 || y >= currentHeight) continue;
+
+            for (int x = ax; x <= bx; x++) {
+                if (x < 0 || x >= currentWidth) continue;
+
+                float texU = (1.0f - t) * su + t * eu;
+                float texV = (1.0f - t) * sv + t * ev;
+                float texW = (1.0f - t) * sw + t * ew;
+                t += step;
+
+                float invW = 1.0f / texW;
+                int u = (int) ((texU * invW) * (texWidth - 1));
+                int v = (int) ((texV * invW) * (texHeight - 1));
+
+                // Inline clamp
+                u = (u < 0) ? 0 : (Math.min(u, texWidth - 1));
+                v = (v < 0) ? 0 : (Math.min(v, texHeight - 1));
+
+                int rgb = tex.getRGB(u, v);
+
+                // Optional: precompute brightness table or inline brightness
+                int color = EColors.changeBrightness(rgb, (int) (lighting * 255));
+                float depth = calculateDepth(x, y, tri, area);
+                drawPixel(x, y, color, depth);
             }
         }
     }
@@ -654,6 +644,7 @@ public class PerspectiveRenderer {
         Vector3 v0 = t.v0.pos, v1 = t.v1.pos, v2 = t.v2.pos;
         return (v0.y - v2.y) * (v1.x - v2.x) + (v1.y - v2.y) * (v2.x - v0.x);
     }
+    
     private float calculateDepth(int x, int y, Triangle t, float area) {
         Vector3 v0 = t.v0.pos, v1 = t.v1.pos, v2 = t.v2.pos;
         float b1 = ((y - v2.y) * (v1.x - v2.x) + (v1.y - v2.y) * (v2.x - x)) / area;
@@ -663,14 +654,33 @@ public class PerspectiveRenderer {
     }
     
     /** Draws a single pixel at the given x/y at the given depth onto the given image. */
-    private void drawPixel(int x, int y, int color, float depth, BufferedImage canvas) {
+    private synchronized void drawPixel(int x, int y, int color, float depth) {
         int zIndex = y * currentWidth + x;
-        if (zBuffer[zIndex] >= depth) {
-            int dst = canvas.getRGB(x, y);
-            color = blend(color, dst);
-            canvas.setRGB(x, y, color);
+        int pIndex = x + y * currentWidth;
+        if (depth < zBuffer[zIndex]) {
+            int alpha = (color >>> 24) & 0xFF;
+
+            if (alpha < 255) {
+                int dst = pixelBuffer[pIndex];
+                color = blend(color, dst);
+            }
+
+            pixelBuffer[pIndex] = color;
             zBuffer[zIndex] = depth;
         }
+    }
+    
+    private boolean isBackface(Triangle t) {
+        Vector3 v0 = t.v0.pos;
+        Vector3 v1 = t.v1.pos;
+        Vector3 v2 = t.v2.pos;
+
+        // Compute the signed area of the triangle (2D cross product)
+        float area = (v1.x - v0.x) * (v2.y - v0.y) - 
+                     (v2.x - v0.x) * (v1.y - v0.y);
+
+        // If area < 0, the triangle is back-facing
+        return area < 0;
     }
     
     //=======================
@@ -679,16 +689,6 @@ public class PerspectiveRenderer {
     
     private Triangle transformTriangle(Entity e, Triangle t, Camera camera) {
         Triangle out = makeTransform(e).multiply(t);
-        if (t.alwaysFaceCamera) {
-            Vector3 v0 = out.v0();
-            Vector3 v1 = out.v1();
-            Vector3 v2 = out.v2();
-            
-            Vector3 cameraRight = new Vector3(view.m00, view.m10, view.m20);
-            Vector3 cameraUp = new Vector3(view.m01, view.m11, view.m21);
-            
-            
-        }
         return out;
     }
     
@@ -762,67 +762,5 @@ public class PerspectiveRenderer {
 
         return new Color(red, green, blue);
     }
-    
-//    {
-//        final int dx = Math.abs(x1 - x0), sx = (x0 < x1) ? 1 : -1;
-//        final int dy = Math.abs(y1 - y0), sy = (y0 < y1) ? 1 : -1;
-//        final float ed = (dx + dy == 0) ? 1.0f : (float) Math.sqrt(dx * dx + dy * dy);
-//        int err = dx + dy, e2, x2, y2;
-//        int alpha, out_color;
-//        
-//        //System.out.println("\nLINE");
-//        final float wd = (lineWidth + 1) / 2.0f;
-//        while (true) {
-//            float tx = (x0 - start.x) / (end.x - start.x);
-//            float ty = (y0 - start.y) / (end.y - start.y);
-//            float t = (tx + ty) / 2;
-//            float depth = (end.z - start.z) * t + start.z;
-//            
-//            if (x0 >= 0 && x0 < w && y0 >= 0 && y0 < h) {
-//                alpha = (int) Math.max(0, 255.0f * Math.abs(err - dx + dy) / ed - wd + 1);
-//                //System.out.println(err + " : " + dx + " : " + dy + " => " + alpha);
-//                int src_color = EColors.changeOpacity(baseColor, alpha);
-//                int dst_color = canvas.getRGB(x0, y0);
-//                out_color = blend(src_color, dst_color);
-//                drawPixel(x0, y0, out_color, depth, canvas);
-//            }
-//            
-//            e2 = err;
-//            x2 = x0;
-//            
-//            if (2 * e2 >= -dx) {
-//                for (e2 += dy, y2 = y0; (e2 < (ed * wd)) && (y1 != y2 || dx > dy); e2 += dx) {
-//                    y2 += sy;
-//                    if (x0 >= 0 && x0 < w && y2 >= 0 && y2 < h) {
-//                        alpha = (int) Math.max(0, 255.0f * Math.abs(e2) / ed - wd + 1);
-//                        int src_color = EColors.changeOpacity(baseColor, alpha);
-//                        int dst_color = canvas.getRGB(x0, y2);
-//                        out_color = blend(src_color, dst_color);
-//                        drawPixel(x0, y2, out_color, depth, canvas);
-//                    }
-//                }
-//                if (x0 == x1) break;
-//                //System.out.println("ERR: " + err);
-//                e2 = err;
-//                err -= dy;
-//                x0 += sx;
-//            }
-//            if (2 * e2 <= dy) {
-//                for (e2 = dx - e2; (e2 < (ed * wd)) && (x1 != x2 || dx < dy); e2 += dy) {
-//                    x2 += sx;
-//                    if (x2 >= 0 && x2 < w && y0 >= 0 && y0 < h) {
-//                        alpha = (int) Math.max(0, 255 - 255.0f * Math.abs(e2) / ed - wd + 1);
-//                        int src_color = EColors.changeOpacity(baseColor, alpha);
-//                        int dst_color = canvas.getRGB(x0, y0);
-//                        out_color = blend(src_color, dst_color);
-//                        //drawPixel(x2, y0, out_color, depth, canvas);
-//                    }
-//                }
-//                if (y0 == y1) break;
-//                err += dx;
-//                y0 += sy;
-//            }
-//        }
-//    }
     
 }

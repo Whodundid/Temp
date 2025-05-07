@@ -62,7 +62,7 @@ public class RenderingPanel extends JPanel implements KeyListener, MouseListener
     private int curNumTicks = 0;
     private int ticks = 0;
     
-    private long fps = 60;
+    private long fps = 240;
     private double timeF = 1000.0 / fps;
     private double deltaF = 0;
     private long startTime = 0L;
@@ -186,63 +186,61 @@ public class RenderingPanel extends JPanel implements KeyListener, MouseListener
         }
         
         // prepare timers
-        startTime = System.currentTimeMillis();
-        oldTime = startTime;
-        timer = startTime;
-        initialTime = System.currentTimeMillis();
+        startTime = System.nanoTime();
+        //oldTime = startTime;
+        //timer = startTime;
+        initialTime = System.nanoTime();
         
         new Thread(() -> {
             while (true) {
                 thing();
+                try {
+                    Thread.sleep(1);
+                }
+                catch (InterruptedException ignored) {}
             }
         }).start();
     }
     
     private void thing() {
         try {
-            long currentTime = System.currentTimeMillis();
-            deltaT += (currentTime - initialTime) / timeT;
-            deltaF += (currentTime - initialTime) / timeF;
-            initialTime = currentTime;
-            
+            long now = System.nanoTime();
+            double elapsedMs = (now - initialTime) / 1_000_000.0;
+            initialTime = now;
+
+            deltaT += elapsedMs / timeT;
+            deltaF += elapsedMs / timeF;
+
             if (deltaT >= 1) {
                 oldTime = curTime;
                 curTime = System.currentTimeMillis();
-                
-                // 'dt' is ms
                 dt = curTime - oldTime;
-                //if (dt > 15.0f) dt = 15.0f;
                 ticks++;
                 runTick(dt);
-                
                 deltaT--;
             }
-            
+
             if (deltaF >= 1) {
-                runRenderTick(currentTime - oldTime);
-                frames++;
-                deltaF--;
+                runRenderTick(curTime - oldTime);
             }
-            
-            // measure fps
-            if (currentTime - timer > 1000) {
+
+            long nowMillis = System.currentTimeMillis();
+            if (nowMillis - timer > 1000) {
                 curFrameRate = frames;
                 curNumTicks = ticks;
                 frames = 0;
                 ticks = 0;
-                timer += 1000;
+                timer = nowMillis;
             }
-            
+
             if (deltaT > 3 || deltaF > 5) {
                 deltaT = 0;
                 deltaF = 0;
             }
-        }
-        catch (Exception e) {
+        } catch (Exception e) {
             e.printStackTrace();
         }
-    }
-    
+    }    
     private void runTick(float dt) {
         if (t1 != null) t1.rotation.y += 0.001f;
         if (earth != null && !leftPress) earth.rotation.y += 0.0001f;
@@ -293,17 +291,20 @@ public class RenderingPanel extends JPanel implements KeyListener, MouseListener
 
         // setup image and render
         createPanelImage();
-        renderer.render(camera, entities, img);
+        boolean useSSAA = false;
+        int iw = (useSSAA) ? imgWidth / 2 : imgWidth;
+        int ih = (useSSAA) ? imgHeight / 2 : imgHeight;
+        renderer.render(camera, entities, img, getWidth(), getHeight(), useSSAA);
         
         // draw debug camera position and rotation
-        g2.drawImage(img, 0, 0, getWidth(), getHeight(), 0, 0, imgWidth, imgHeight, null);
+        g2.drawImage(img, 0, 0, getWidth(), getHeight(), 0, 0, iw, ih, null);
         
-        try {
-            drawBanjo(g2);
-        }
-        catch (Exception e) {
-            System.out.println("bad");
-        }
+//        try {
+//            drawBanjo(g2);
+//        }
+//        catch (Exception e) {
+//            System.out.println("bad");
+//        }
         
         g2.setColor(Color.WHITE);
         String pos = "POS: " + camera.position;
@@ -349,6 +350,9 @@ public class RenderingPanel extends JPanel implements KeyListener, MouseListener
 //        line.setStepDotSize(5);
 //        line.setLineWidth(2);
 //        line.draw(g2, 80);
+        
+        frames++;
+        deltaF--;
     }
     
     @SuppressWarnings("unused")
@@ -900,8 +904,7 @@ public class RenderingPanel extends JPanel implements KeyListener, MouseListener
     @Override public void mouseEntered(MouseEvent e) {}
     @Override public void mouseExited(MouseEvent e) {}
     @Override public void keyTyped(KeyEvent e) {}
-    @Override public void mouseClicked(MouseEvent e) {}
-    
+    @Override public void mouseClicked(MouseEvent e) {}    
     //=========
     // Methods
     //=========
@@ -923,6 +926,7 @@ public class RenderingPanel extends JPanel implements KeyListener, MouseListener
         
         imgWidth = 21 * renderScale;
         imgHeight = 9 * renderScale;
+        System.out.println(getWidth() + " : " + getHeight());
         
         //imgWidth = 256; imgHeight = 144;
         //imgWidth = 320; imgHeight = 240;
@@ -933,18 +937,18 @@ public class RenderingPanel extends JPanel implements KeyListener, MouseListener
         //imgWidth = 1280; imgHeight = 720;
         //imgWidth = 1920; imgHeight = 1080;
         
-        Sphere starsModel = new Sphere(200000.0f, 10, 10/*, Test3DWindow.stars*/);
+        Sphere starsModel = new Sphere(200000.0f, 10, 10, Test3DWindow.stars);
         starsModel.insideOut = true;
         starsModel.fullBright = true;
         Entity stars = new Entity("Stars", starsModel);
-        stars.setRotationDegrees(-90f, 0, 0);
+        stars.setRotationDegrees(90f, 0, 0);
         stars.setPosition(0, 0, 0);
         
         //Sphere planetModel = new Sphere(1.0f, 70, 70, Test3DWindow.world);
-        Sphere planetModel = new Sphere(1.0f, 50, 50/*, Test3DWindow.worldBig*/);
+        Sphere planetModel = new Sphere(1.0f, 70, 70, Test3DWindow.worldBig);
         planetModel.fullBright = true;
         earth = new Entity("Planet", planetModel);
-        earth.setRotationDegrees(-90.0f, 180f, 0.0f);
+        earth.setRotationDegrees(90.0f, 0f, 0.0f);
         
         
         Model axisModel = Test3DWindow.loadModel("axis.obj");

@@ -35,8 +35,7 @@ public class Test3DWindow extends JFrame {
     public static BufferedImage jupiter;
     public static BufferedImage saturn;
     public static BufferedImage uranus;
-    public static BufferedImage neptune;
-    
+    public static BufferedImage neptune;    
     //==============
     // Constructors
     //==============
@@ -61,7 +60,7 @@ public class Test3DWindow extends JFrame {
 //            uranus = ImageIO.read(getClass().getResource("/2k_uranus.jpg"));
 //            neptune = ImageIO.read(getClass().getResource("/2k_neptune.jpg"));
         }
-        catch (IOException e) {
+        catch (Exception e) {
             e.printStackTrace();
         }
         
