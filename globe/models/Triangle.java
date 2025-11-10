@@ -1,8 +1,11 @@
-package controller.globe;
+package controller.globe.models;
 
 import java.awt.Color;
 import java.awt.image.BufferedImage;
 
+import controller.globe.math.Vector2;
+import controller.globe.math.Vector3;
+import controller.globe.math.Vertex;
 import eutil.datatypes.util.EList;
 
 public class Triangle extends Model {
@@ -89,6 +92,11 @@ public class Triangle extends Model {
     @Override
     public String toString() {
         return "T[" + v0 + ";" + v1 + ";" + v2 + ";" + color + "]";
+    }
+    
+    @Override
+    public Triangle copy() {
+        return new Triangle(this);
     }    
     //=========
     // Getters
@@ -161,7 +169,7 @@ public class Triangle extends Model {
         // calculate normal
         Vector3 line1 = v1.pos.sub(v0.pos);
         Vector3 line2 = v2.pos.sub(v0.pos);
-        return line1.cross(line2).norm();
+        return line1.cross(line2).normalize();
     }
     
     public float cameraRay(Vector3 normal, Vector3 cameraPos) {
@@ -170,9 +178,28 @@ public class Triangle extends Model {
         return normal.dot(cameraRay);
     }
     
+    public Triangle positionInWindow(Vector3 offsetView, float width, float height) {
+        // scale into view
+        v0.pos = v0.pos.div(v0.pos.w);
+        v1.pos = v1.pos.div(v1.pos.w);
+        v2.pos = v2.pos.div(v2.pos.w);
+        // x/y are inverted so put them back
+        v0.pos.x *= -1.0f; v0.pos.y *= -1.0f;
+        v1.pos.x *= -1.0f; v1.pos.y *= -1.0f;
+        v2.pos.x *= -1.0f; v2.pos.y *= -1.0f;
+        // offset verts into visible normalized space
+        v0.pos = v0.pos.add(offsetView);
+        v1.pos = v1.pos.add(offsetView);
+        v2.pos = v2.pos.add(offsetView);
+        v0.pos.x *= 0.5f * width; v0.pos.y *= 0.5f * height;
+        v1.pos.x *= 0.5f * width; v1.pos.y *= 0.5f * height;
+        v2.pos.x *= 0.5f * width; v2.pos.y *= 0.5f * height;
+        return this;
+    }
+    
     public Triangle[] clipAgainstPlane(Vector3 plane, Vector3 normal) {
         // make sure plane is normal
-        normal = normal.norm();
+        normal = normal.normalize();
         
         // return signed shortest distance from point to plane, plane normal must be normalized
         float dotNP = normal.dot(plane);

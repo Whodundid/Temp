@@ -1,4 +1,4 @@
-package controller.globe;
+package controller.globe.math;
 
 public class Matrix3 {
     

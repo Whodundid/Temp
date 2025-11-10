@@ -1,4 +1,4 @@
-package controller.globe;
+package controller.globe.math;
 
 public class Vector2 {
     
@@ -52,7 +52,12 @@ public class Vector2 {
         return lineStart.add(lineToIntersect);
     }
     
-    public void set(float x, float y, float z) {
+    public void set(Vector2 t) {
+        this.x = t.x;
+        this.y = t.y;
+    }
+    
+    public void set(float x, float y) {
         this.x = x;
         this.y = y;
     }

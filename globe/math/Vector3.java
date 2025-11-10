@@ -1,4 +1,4 @@
-package controller.globe;
+package controller.globe.math;
 
 import java.text.DecimalFormat;
 
@@ -31,7 +31,7 @@ public class Vector3 {
     
     @Override
     public String toString() {
-        var df = new DecimalFormat("#.##");
+        var df = new DecimalFormat("#.#####");
         return "<" + df.format(x) + ", " + df.format(y) + ", " + df.format(z) + ">";
     }    
     //=========
@@ -49,13 +49,13 @@ public class Vector3 {
     public Vector3 sub(Vector3 v) { return new Vector3(x - v.x, y - v.y, z - v.z); }
     public Vector3 mul(float s) { return new Vector3(x * s, y * s, z * s); }
     public Vector3 div(float s) { return new Vector3(x / s, y / s, z / s); }
-    public Vector3 norm() { float l = len(); return new Vector3(x / l, y / l, z / l); }
+    public Vector3 normalize() { float l = len(); return new Vector3(x / l, y / l, z / l); }
     public Vector3 cross(Vector3 v) { return new Vector3(y*v.z - z*v.y, z*v.x - x*v.z, x*v.y - y*v.x); }
     public float dot(Vector3 v) { return x*v.x + y*v.y + z*v.z; }
     public float len() { return (float) Math.sqrt(dot(this)); }
     
     public static float calculateIntersectionPoint(Vector3 plane, Vector3 normal, Vector3 lineStart, Vector3 lineEnd) {
-        normal = normal.norm();
+        normal = normal.normalize();
         float d = -normal.dot(plane);
         float ad = lineStart.dot(normal);
         float bd = lineEnd.dot(normal);

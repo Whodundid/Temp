@@ -1,6 +1,10 @@
 package controller.globe;
 
 import java.awt.image.BufferedImage;
+import java.util.Map;
+
+import controller.globe.math.Vector3;
+import controller.globe.models.Model;
 
 public class Entity {
     
@@ -13,7 +17,12 @@ public class Entity {
     public BufferedImage texture;
     public Vector3 position = new Vector3();
     public Vector3 rotation = new Vector3();
-    public Vector3 scale = new Vector3(1, 1, 1);    
+    public Vector3 scale = new Vector3(1, 1, 1);
+    public float movementSpeed;
+    public float rotationSpeed;
+    public boolean hidden;
+    /** Can be used to store custom specific values. */
+    public Map<String, Object> properties;    
     //==============
     // Constructors
     //==============
@@ -41,7 +50,9 @@ public class Entity {
     
     public void setScale(float s) {
         scale.set(s, s, s);
-    }    
+    }
+    
+    public void update(float dt) {}    
     //=========
     // Getters
     //=========

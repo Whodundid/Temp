@@ -4,16 +4,17 @@ import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.image.BufferedImage;
 import java.io.File;
-import java.io.IOException;
 
 import javax.imageio.ImageIO;
-import javax.swing.JButton;
 import javax.swing.JFrame;
 
+import controller.globe.models.Model;
+import controller.globe.models.Triangle;
 import eutil.datatypes.util.EList;
 import eutil.file.EFileUtil;
 import eutil.file.LineReader;
-import eutil.swing.LeftClick;
+import eutil.swing.components.EButton;
+import eutil.swing.listeners.LeftPress;
 
 public class Test3DWindow extends JFrame {
     
@@ -22,7 +23,7 @@ public class Test3DWindow extends JFrame {
     //========
     
     private RenderingPanel drawPanel;
-    private JButton rebuild;
+    private EButton rebuild;
 
     public static BufferedImage world;
     public static BufferedImage worldBig;
@@ -66,8 +67,7 @@ public class Test3DWindow extends JFrame {
         
         drawPanel = new RenderingPanel(1080, 720);
         
-        rebuild = new JButton("Rebuild");
-        LeftClick.applyOn(rebuild, () -> drawPanel.setup());
+        rebuild = new EButton("Rebuild", drawPanel::setup);
         rebuild.addKeyListener(drawPanel);
         
         add(rebuild, BorderLayout.NORTH);
@@ -77,57 +77,4 @@ public class Test3DWindow extends JFrame {
         setVisible(true);
     }
     
-    //=======================
-    // Static Helper Methods
-    //=======================
-    
-    public static Model loadModel(String fileName) {
-        try {
-            var loader = Thread.currentThread().getContextClassLoader();
-            File file = new File(loader.getResource(fileName).toURI());
-            
-            if (!EFileUtil.fileExists(file)) return null;
-            
-            try (var r = new LineReader(file)) {
-                EList<Triangle> loaded = EList.newList();
-                EList<Vector3> verts = EList.newList();
-                
-                while (r.hasNextLine()) {
-                    String line = r.nextLine();
-                    String[] parts = line.split(" ");
-                    
-                    // comments
-                    if (parts.length == 0 || parts[0].equals("#")) continue;
-                    
-                    if (parts.length == 4) {
-                        // vertex
-                        if (parts[0].equals("v")) {
-                            float x = Float.parseFloat(parts[1]);
-                            float y = Float.parseFloat(parts[2]);
-                            float z = Float.parseFloat(parts[3]);
-                            verts.add(new Vector3(x, y, z));
-                        }
-                        if (parts[0].equals("f")) {
-                            int f0 = Integer.parseInt(parts[1]);
-                            int f1 = Integer.parseInt(parts[2]);
-                            int f2 = Integer.parseInt(parts[3]);
-                            Vertex v0 = new Vertex(verts.get(f0 - 1), new Vector2());
-                            Vertex v1 = new Vertex(verts.get(f1 - 1), new Vector2());
-                            Vertex v2 = new Vertex(verts.get(f2 - 1), new Vector2());
-                            loaded.add(new Triangle(v0, v1, v2, Color.WHITE));
-                        }
-                    }
-                }
-                
-                Model model = new Model() {};
-                model.triangles.addAll(loaded);
-                return model;
-            }
-        }
-        catch (Exception e) {
-            e.printStackTrace();
-        }
-        return null;
-    }
-
 }
