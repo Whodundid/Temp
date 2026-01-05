@@ -1,0 +1,446 @@
+Project layout
+zoomcanvas/
+  src/
+    zoomcanvas/
+      Main.java
+      BlueprintCanvas.java
+      Camera2D.java
+      Node.java
+
+Main.java
+package zoomcanvas;
+
+import javax.swing.*;
+import java.awt.*;
+
+public class Main {
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(() -> {
+            JFrame f = new JFrame("Pan/Zoom Canvas (MMB pan, Ctrl+Wheel zoom, DnD files)");
+            f.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
+
+            BlueprintCanvas canvas = new BlueprintCanvas();
+
+            f.setLayout(new BorderLayout());
+            f.add(canvas, BorderLayout.CENTER);
+
+            f.setSize(1100, 700);
+            f.setLocationRelativeTo(null);
+            f.setVisible(true);
+        });
+    }
+}
+
+Camera2D.java
+package zoomcanvas;
+
+import java.awt.geom.AffineTransform;
+import java.awt.geom.Point2D;
+
+public final class Camera2D {
+    // scale and pan are in VIEW space (pixels)
+    private double scale = 1.0;
+    private double panX = 0.0;
+    private double panY = 0.0;
+
+    public double getScale() { return scale; }
+    public double getPanX() { return panX; }
+    public double getPanY() { return panY; }
+
+    public void panBy(double dxView, double dyView) {
+        panX += dxView;
+        panY += dyView;
+    }
+
+    public void setScaleClamped(double newScale) {
+        scale = clamp(newScale, 0.10, 6.00);
+    }
+
+    public Point2D.Double viewToWorld(double vx, double vy) {
+        return new Point2D.Double((vx - panX) / scale, (vy - panY) / scale);
+    }
+
+    public Point2D.Double worldToView(double wx, double wy) {
+        return new Point2D.Double(wx * scale + panX, wy * scale + panY);
+    }
+
+    /**
+     * Zoom while keeping the world point under (vx,vy) stationary on screen.
+     */
+    public void zoomAt(double vx, double vy, double newScale) {
+        newScale = clamp(newScale, 0.10, 6.00);
+
+        Point2D.Double worldUnderCursor = viewToWorld(vx, vy);
+        scale = newScale;
+
+        // Solve for pan so: vx = worldX*scale + panX  => panX = vx - worldX*scale
+        panX = vx - worldUnderCursor.x * scale;
+        panY = vy - worldUnderCursor.y * scale;
+    }
+
+    /**
+     * World -> View transform (apply to Graphics2D).
+     */
+    public AffineTransform worldToViewTransform() {
+        AffineTransform tx = new AffineTransform();
+        tx.translate(panX, panY);
+        tx.scale(scale, scale);
+        return tx;
+    }
+
+    private static double clamp(double v, double lo, double hi) {
+        return Math.max(lo, Math.min(hi, v));
+    }
+}
+
+Node.java
+package zoomcanvas;
+
+import java.awt.*;
+import java.awt.geom.Rectangle2D;
+
+public final class Node {
+    public double x, y;        // world coords (top-left)
+    public double w, h;        // world size
+    public String title;
+
+    public boolean selected;
+
+    public Node(double x, double y, double w, double h, String title) {
+        this.x = x; this.y = y; this.w = w; this.h = h;
+        this.title = title;
+    }
+
+    public Rectangle2D.Double bounds() {
+        return new Rectangle2D.Double(x, y, w, h);
+    }
+
+    public boolean hit(double wx, double wy) {
+        return wx >= x && wx <= x + w && wy >= y && wy <= y + h;
+    }
+
+    public void paint(Graphics2D g2) {
+        // Assumes g2 is already in WORLD space
+        double arc = 12.0;
+
+        Shape body = new java.awt.geom.RoundRectangle2D.Double(x, y, w, h, arc, arc);
+        g2.setColor(selected ? new Color(70, 120, 255, 220) : new Color(50, 50, 55, 220));
+        g2.fill(body);
+
+        g2.setStroke(new BasicStroke(2f));
+        g2.setColor(selected ? new Color(160, 200, 255, 240) : new Color(110, 110, 120, 220));
+        g2.draw(body);
+
+        // Title bar
+        g2.setColor(new Color(30, 30, 35, 220));
+        g2.fill(new java.awt.geom.RoundRectangle2D.Double(x, y, w, 26, arc, arc));
+
+        g2.setColor(Color.WHITE);
+        g2.setFont(g2.getFont().deriveFont(Font.BOLD, 12f));
+        g2.drawString(title, (float)(x + 10), (float)(y + 17));
+    }
+}
+
+BlueprintCanvas.java
+package zoomcanvas;
+
+import javax.swing.*;
+import java.awt.*;
+import java.awt.datatransfer.DataFlavor;
+import java.awt.dnd.*;
+import java.awt.event.*;
+import java.awt.geom.*;
+import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
+
+public class BlueprintCanvas extends JComponent {
+
+    private final Camera2D cam = new Camera2D();
+    private final List<Node> nodes = new ArrayList<>();
+
+    // Interaction state
+    private Point lastMouseView;
+    private boolean panning;
+
+    private Node draggingNode;
+    private Point2D.Double dragGrabOffsetWorld; // mouseWorld - nodeTopLeftWorld
+
+    private boolean marquee;
+    private Point2D.Double marqueeStartWorld;
+    private Point2D.Double marqueeEndWorld;
+
+    public BlueprintCanvas() {
+        setOpaque(true);
+        setBackground(new Color(0x1e1e1e));
+        setFocusable(true);
+
+        // Some starter nodes
+        nodes.add(new Node(100, 100, 220, 140, "BeginPlay"));
+        nodes.add(new Node(420, 220, 260, 160, "Branch"));
+        nodes.add(new Node(780, 140, 240, 140, "Print String"));
+
+        installMouseControls();
+        installFileDrop();
+
+        // Nice default camera position: center-ish
+        cam.panBy(50, 50);
+    }
+
+    public Point2D.Double viewToWorld(double vx, double vy) {
+        return cam.viewToWorld(vx, vy);
+    }
+
+    private void installMouseControls() {
+        MouseAdapter m = new MouseAdapter() {
+            @Override public void mousePressed(MouseEvent e) {
+                requestFocusInWindow();
+                lastMouseView = e.getPoint();
+
+                if (SwingUtilities.isMiddleMouseButton(e)) {
+                    panning = true;
+                    setCursor(Cursor.getPredefinedCursor(Cursor.MOVE_CURSOR));
+                    return;
+                }
+
+                Point2D.Double mw = cam.viewToWorld(e.getX(), e.getY());
+
+                if (SwingUtilities.isLeftMouseButton(e)) {
+                    Node hit = findTopNodeAt(mw.x, mw.y);
+
+                    if (hit != null) {
+                        // selection behavior: click selects, shift adds/removes
+                        if (!e.isShiftDown()) {
+                            clearSelection();
+                            hit.selected = true;
+                        } else {
+                            hit.selected = !hit.selected;
+                        }
+
+                        // Start dragging the node ONLY if it ended up selected
+                        if (hit.selected) {
+                            draggingNode = hit;
+                            dragGrabOffsetWorld = new Point2D.Double(mw.x - hit.x, mw.y - hit.y);
+                        }
+                        repaint();
+                    } else {
+                        // Start marquee selection
+                        if (!e.isShiftDown()) clearSelection();
+                        marquee = true;
+                        marqueeStartWorld = mw;
+                        marqueeEndWorld = mw;
+                        repaint();
+                    }
+                }
+            }
+
+            @Override public void mouseDragged(MouseEvent e) {
+                if (lastMouseView == null) lastMouseView = e.getPoint();
+
+                int dx = e.getX() - lastMouseView.x;
+                int dy = e.getY() - lastMouseView.y;
+
+                if (panning) {
+                    cam.panBy(dx, dy);
+                    repaint();
+                } else {
+                    Point2D.Double mw = cam.viewToWorld(e.getX(), e.getY());
+
+                    if (draggingNode != null) {
+                        // Move dragged node in WORLD space
+                        draggingNode.x = mw.x - dragGrabOffsetWorld.x;
+                        draggingNode.y = mw.y - dragGrabOffsetWorld.y;
+                        repaint();
+                    } else if (marquee) {
+                        marqueeEndWorld = mw;
+                        updateMarqueeSelection();
+                        repaint();
+                    }
+                }
+
+                lastMouseView = e.getPoint();
+            }
+
+            @Override public void mouseReleased(MouseEvent e) {
+                panning = false;
+                setCursor(Cursor.getDefaultCursor());
+
+                draggingNode = null;
+                dragGrabOffsetWorld = null;
+
+                marquee = false;
+                marqueeStartWorld = null;
+                marqueeEndWorld = null;
+
+                lastMouseView = null;
+                repaint();
+            }
+
+            @Override public void mouseWheelMoved(MouseWheelEvent e) {
+                // You asked for Ctrl+wheel zoom (otherwise ignore)
+                if (!e.isControlDown()) return;
+
+                // Smooth zoom factor: wheel rotation negative = zoom in
+                double factor = Math.pow(1.12, -e.getPreciseWheelRotation());
+                cam.zoomAt(e.getX(), e.getY(), cam.getScale() * factor);
+                repaint();
+            }
+        };
+
+        addMouseListener(m);
+        addMouseMotionListener(m);
+        addMouseWheelListener(m);
+    }
+
+    private void installFileDrop() {
+        new DropTarget(this, new DropTargetAdapter() {
+            @Override public void drop(DropTargetDropEvent dtde) {
+                try {
+                    dtde.acceptDrop(DnDConstants.ACTION_COPY);
+                    Point v = dtde.getLocation();
+                    Point2D.Double w = cam.viewToWorld(v.x, v.y);
+
+                    if (dtde.isDataFlavorSupported(DataFlavor.javaFileListFlavor)) {
+                        @SuppressWarnings("unchecked")
+                        List<File> files = (List<File>) dtde.getTransferable()
+                                .getTransferData(DataFlavor.javaFileListFlavor);
+
+                        // Create a node for the first file name (simple demo)
+                        String title = files.isEmpty() ? "Dropped File" : files.get(0).getName();
+                        nodes.add(new Node(w.x, w.y, 280, 140, "Import: " + title));
+
+                        dtde.dropComplete(true);
+                        repaint();
+                    } else {
+                        dtde.dropComplete(false);
+                    }
+                } catch (Exception ex) {
+                    dtde.dropComplete(false);
+                }
+            }
+        });
+    }
+
+    private Node findTopNodeAt(double wx, double wy) {
+        // Simple z-order: last drawn = top
+        for (int i = nodes.size() - 1; i >= 0; i--) {
+            Node n = nodes.get(i);
+            if (n.hit(wx, wy)) return n;
+        }
+        return null;
+    }
+
+    private void clearSelection() {
+        for (Node n : nodes) n.selected = false;
+    }
+
+    private void updateMarqueeSelection() {
+        if (marqueeStartWorld == null || marqueeEndWorld == null) return;
+
+        Rectangle2D.Double box = marqueeRectWorld();
+        for (Node n : nodes) {
+            if (box.intersects(n.bounds())) {
+                n.selected = true; // with shift you keep existing; we already handled clearSelection earlier
+            }
+        }
+    }
+
+    private Rectangle2D.Double marqueeRectWorld() {
+        double x1 = marqueeStartWorld.x, y1 = marqueeStartWorld.y;
+        double x2 = marqueeEndWorld.x, y2 = marqueeEndWorld.y;
+        double x = Math.min(x1, x2);
+        double y = Math.min(y1, y2);
+        double w = Math.abs(x2 - x1);
+        double h = Math.abs(y2 - y1);
+        return new Rectangle2D.Double(x, y, w, h);
+    }
+
+    @Override
+    protected void paintComponent(Graphics g) {
+        super.paintComponent(g);
+
+        Graphics2D g2 = (Graphics2D) g.create();
+        try {
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+            // Background
+            g2.setColor(getBackground());
+            g2.fillRect(0, 0, getWidth(), getHeight());
+
+            // Draw grid in world space (so it scales/pans naturally)
+            paintGrid(g2);
+
+            // Draw nodes in world space
+            g2.transform(cam.worldToViewTransform());
+            for (Node n : nodes) n.paint(g2);
+
+            // Draw marquee on top (still in world space here, so use a world rect)
+            if (marquee && marqueeStartWorld != null && marqueeEndWorld != null) {
+                Rectangle2D.Double r = marqueeRectWorld();
+                g2.setColor(new Color(120, 170, 255, 60));
+                g2.fill(r);
+                g2.setColor(new Color(160, 200, 255, 160));
+                g2.setStroke(new BasicStroke(1.5f));
+                g2.draw(r);
+            }
+
+            // HUD in view space (reset transform)
+            g2.setTransform(new AffineTransform());
+            g2.setColor(new Color(255, 255, 255, 160));
+            g2.setFont(g2.getFont().deriveFont(Font.PLAIN, 12f));
+            g2.drawString("MMB drag = pan   |   Ctrl+Wheel = zoom   |   LMB drag node   |   LMB empty = marquee   |   Drop a file onto canvas",
+                    12, getHeight() - 12);
+
+        } finally {
+            g2.dispose();
+        }
+    }
+
+    private void paintGrid(Graphics2D g2) {
+        // We’ll render the grid in world space, but we need to know visible world bounds.
+        Point2D.Double w0 = cam.viewToWorld(0, 0);
+        Point2D.Double w1 = cam.viewToWorld(getWidth(), getHeight());
+
+        double left = Math.min(w0.x, w1.x);
+        double right = Math.max(w0.x, w1.x);
+        double top = Math.min(w0.y, w1.y);
+        double bottom = Math.max(w0.y, w1.y);
+
+        // Grid step in world units (scaled by zoom visually)
+        double minor = 50.0;
+        double major = 250.0;
+
+        // Draw using world->view transform
+        AffineTransform old = g2.getTransform();
+        g2.transform(cam.worldToViewTransform());
+
+        // Minor lines
+        g2.setStroke(new BasicStroke(1f));
+        g2.setColor(new Color(255, 255, 255, 18));
+        drawGridLines(g2, left, right, top, bottom, minor);
+
+        // Major lines
+        g2.setColor(new Color(255, 255, 255, 32));
+        drawGridLines(g2, left, right, top, bottom, major);
+
+        // World origin cross
+        g2.setColor(new Color(255, 120, 120, 140));
+        g2.setStroke(new BasicStroke(2f));
+        g2.draw(new Line2D.Double(-10, 0, 10, 0));
+        g2.draw(new Line2D.Double(0, -10, 0, 10));
+
+        g2.setTransform(old);
+    }
+
+    private void drawGridLines(Graphics2D g2, double left, double right, double top, double bottom, double step) {
+        double xStart = Math.floor(left / step) * step;
+        double yStart = Math.floor(top / step) * step;
+
+        for (double x = xStart; x <= right; x += step) {
+            g2.draw(new Line2D.Double(x, top, x, bottom));
+        }
+        for (double y = yStart; y <= bottom; y += step) {
+            g2.draw(new Line2D.Double(left, y, right, y));
+        }
+    }
+}
